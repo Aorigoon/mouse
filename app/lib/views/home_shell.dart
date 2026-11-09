@@ -8,6 +8,7 @@ import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../utils/shake.dart';
 import '../utils/shake_service.dart';
+import '../widgets/floating_nav_bar.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dock_page.dart';
 import 'tools_page.dart';
@@ -155,50 +156,35 @@ class _HomeShellState extends State<HomeShell> {
         }
       },
       child: Scaffold(
-        body: PageView(
-          controller: _pageController,
-          // Home (mouse) par swipe disabled — warna cursor moves page palat dete
-          physics: _index == 0
-              ? const NeverScrollableScrollPhysics()
-              : const ClampingScrollPhysics(),
-          onPageChanged: (i) {
-            HapticFeedback.selectionClick();
-            setState(() => _index = i);
-          },
-          children: const [
-            _KeepAlive(child: HomePage()),
-            _KeepAlive(child: DockPage()),
-            _KeepAlive(child: ToolsPage()),
-            _KeepAlive(child: SettingsView()),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _goTo,
-          indicatorColor: Colors.transparent,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          height: 78,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.mouse, size: 26),
-              selectedIcon: Icon(Icons.mouse, size: 28),
-              label: 'Mouse',
+        // Floating nav ke peeche content dikhe — nav screen se upar tairta hai.
+        extendBody: true,
+        body: Stack(
+          children: [
+            PageView(
+              controller: _pageController,
+              // Home (mouse) par swipe disabled — warna cursor moves page palat dete
+              physics: _index == 0
+                  ? const NeverScrollableScrollPhysics()
+                  : const ClampingScrollPhysics(),
+              onPageChanged: (i) {
+                HapticFeedback.selectionClick();
+                setState(() => _index = i);
+              },
+              children: const [
+                _KeepAlive(child: HomePage()),
+                _KeepAlive(child: DockPage()),
+                _KeepAlive(child: ToolsPage()),
+                _KeepAlive(child: SettingsView()),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(Icons.grid_view, size: 26),
-              selectedIcon: Icon(Icons.grid_view, size: 28),
-              label: 'Apps',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.construction, size: 26),
-              selectedIcon: Icon(Icons.construction, size: 28),
-              label: 'Tools',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings, size: 26),
-              selectedIcon: Icon(Icons.settings, size: 28),
-              label: 'Settings',
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: FloatingNavBar(
+                currentIndex: _index,
+                onTap: _goTo,
+              ),
             ),
           ],
         ),

@@ -141,7 +141,7 @@ class _ToolsPageState extends State<ToolsPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
         children: [
           // ================= MEDIA — gaming transport =================
           _SectionLabel('MEDIA'),

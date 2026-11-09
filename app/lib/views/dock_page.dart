@@ -198,11 +198,11 @@ class _DockPageState extends State<DockPage> {
               ),
             ],
           ),
-          // Floating search bar — overlay, not in bottomNavigationBar
+          // Floating search bar — floating nav se upar
           Positioned(
             left: 16,
             right: 16,
-            bottom: 24, // Above the system nav bar
+            bottom: 112, // Floating nav ke upar
             child: _BeautifulSearchBar(
               controller: _queryController,
               focusNode: _focusNode,
@@ -257,7 +257,7 @@ class _DockPageState extends State<DockPage> {
         await Future.delayed(const Duration(milliseconds: 400));
       },
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 24), // Small bottom padding for scroll comfort
+        padding: const EdgeInsets.only(bottom: 120), // Floating nav ke liye jagah
         children: [
           if (pinned.isNotEmpty) ...[
             Padding(

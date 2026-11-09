@@ -213,7 +213,7 @@ class _TouchpadAreaState extends State<TouchpadArea> {
         ),
         Positioned(
           right: 20,
-          bottom: 20,
+          bottom: 118,
           child: _RightClickButton(onTap: _rightClick),
         ),
       ],
@@ -296,19 +296,33 @@ class _RightClickButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.08),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const SizedBox(
-          width: 54,
-          height: 54,
-          child: Icon(
-            Icons.ads_click,
-            color: Colors.white70,
-            size: 23,
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.09),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: const SizedBox(
+            width: 54,
+            height: 54,
+            child: Icon(
+              Icons.ads_click_rounded,
+              color: Colors.white,
+              size: 23,
+            ),
           ),
         ),
       ),

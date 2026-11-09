@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 /// live/connected status ke liye. Koi multi-color nahi.
 class AppColors {
   static const live = Color(0xFF22C55E);
+
+  /// Aorigoon lime — floating nav ke active pill aur highlights ke liye.
+  static const accent = Color(0xFFD6FF3F);
+  static const accentGlow = Color(0xFFB8E62E);
 }
 
 /// Light default, dark available. Primary = black (light) / white (dark).

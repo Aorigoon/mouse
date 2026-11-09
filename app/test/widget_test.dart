@@ -12,7 +12,11 @@ void main() {
     final pad = tester.getSize(find.byType(TouchpadArea));
     // layout regression guard: touchpad poora visible ho (zero-height bug)
     expect(pad.height, greaterThan(200));
-    // top bar gear (bottom nav removed)
-    expect(find.byIcon(Icons.settings_outlined), findsNWidgets(2));
+    // Naya design: chhota MOUSIFY header + floating nav ke naye icons
+    expect(find.text('MOUSIFY'), findsOneWidget);
+    expect(find.byIcon(Icons.touch_app_rounded), findsWidgets);
+    expect(find.byIcon(Icons.apps_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.handyman_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.settings_suggest_rounded), findsOneWidget);
   });
 }

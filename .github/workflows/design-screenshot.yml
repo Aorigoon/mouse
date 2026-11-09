@@ -1,0 +1,82 @@
+# Real design screenshot — GitHub Actions (asli Flutter render, AI preview nahi)
+#
+# Kya karta hai:
+#   1. Flutter test ko --update-goldens ke saath chalata hai.
+#      test/design_screenshot_test.dart Home screen ko 390x844 @2x par
+#      render karke app/test/goldens/home.png banata hai.
+#   2. Us file ko artifact ke tor par upload karta hai.
+#   3. Us hi file ko screenshots/home.png me copy karke repo me wapas
+#      commit karta hai ([skip ci] ke saath, taake loop na bane).
+#      Phir screenshot seedha GitHub se dekha / download kiya ja sakta hai.
+#
+# Trigger: main par push (app/ ya workflow badle to) ya manual Run workflow.
+
+name: Design Screenshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/design-screenshot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screenshot:
+    name: Render real Flutter screenshot
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter (stable channel)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run all tests (design test ke alawa bhi)
+        run: flutter test
+        continue-on-error: true
+
+      - name: Render screenshot (golden)
+        run: flutter test --update-goldens test/design_screenshot_test.dart
+
+      - name: Check screenshot exists
+        run: ls -lh test/goldens/home.png
+
+      - name: Upload screenshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-screenshot
+          path: app/test/goldens/home.png
+          retention-days: 30
+
+      - name: Commit screenshot back to repo
+        working-directory: .
+        run: |
+          mkdir -p screenshots
+          cp app/test/goldens/home.png screenshots/home.png
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add screenshots/home.png
+          git diff --cached --quiet || git commit -m "chore: update design screenshot [skip ci]"
+          git push

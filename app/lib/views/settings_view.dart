@@ -190,7 +190,7 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // ================= CONNECTION =================
