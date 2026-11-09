@@ -1,0 +1,12 @@
+[Unit]
+Description=Mousify server (phone -> PC mouse/keyboard remote)
+After=network.target
+
+[Service]
+# install.sh ise ~/.config/systemd/user/ me sahi paths ke saath copy karta hai
+ExecStart=/usr/bin/env python -m mousify_server run
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
