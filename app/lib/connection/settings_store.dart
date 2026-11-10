@@ -21,6 +21,9 @@ class AppSettings extends ChangeNotifier {
   bool naturalScroll = false;
   bool swapButtons = false;
   bool isDark = false; // light default
+  // Motion Control — phone tilt se cursor move (default off).
+  bool motionControl = false;
+  double motionSensitivity = 1.0;
   List<String> history = [];
   List<String> pinnedApps = [];
   String? appsCacheJson; // "id|name" entries — offline dock ke liye
@@ -41,6 +44,8 @@ class AppSettings extends ChangeNotifier {
     doubleTapSpeed = _prefs.getDouble('double_tap_speed') ?? 350;
     naturalScroll = _prefs.getBool('natural_scroll') ?? false;
     swapButtons = _prefs.getBool('swap_buttons') ?? false;
+    motionControl = _prefs.getBool('motion_control') ?? false;
+    motionSensitivity = _prefs.getDouble('motion_sensitivity') ?? 1.0;
     isDark = _prefs.getBool('is_dark') ?? false; // light default
     history = _prefs.getStringList('history') ?? [];
     pinnedApps = _prefs.getStringList('pinned_apps') ?? [];
@@ -96,6 +101,18 @@ class AppSettings extends ChangeNotifier {
   void setSwapButtons(bool v) {
     swapButtons = v;
     _prefs.setBool('swap_buttons', v);
+    notifyListeners();
+  }
+
+  void setMotionControl(bool v) {
+    motionControl = v;
+    _prefs.setBool('motion_control', v);
+    notifyListeners();
+  }
+
+  void setMotionSensitivity(double v) {
+    motionSensitivity = v;
+    _prefs.setDouble('motion_sensitivity', v);
     notifyListeners();
   }
 

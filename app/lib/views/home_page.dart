@@ -5,9 +5,14 @@ import 'package:provider/provider.dart';
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../theme.dart';
+import '../widgets/mouse_controls_sheet.dart';
 import '../widgets/touchpad_area.dart';
 
-/// Home — poori screen plain black touchpad. Koi header nahi.
+/// Home — poori screen plain black touchpad, upar right corner par chips.
+///
+/// Right corner: OS chip (server batata hai PC Windows hai, Fedora hai
+/// ya Ubuntu) + three-dot button — us se Mouse Controls bottom sheet
+/// khulti hai (sensitivity, scroll, double-tap waghera).
 ///
 ///   • single tap            → left click
 ///   • double tap            → composer
@@ -20,6 +25,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final conn = context.watch<MousifyConnection>();
     final settings = context.read<AppSettings>();
+    final connected = conn.state == ConnState.connected;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -46,16 +52,17 @@ class HomePage extends StatelessWidget {
               ),
             ),
           ),
-          // Upar khubsurat header — brand + instructions, sab header ke andar.
-          // Neeche floating nav ke upar wala glass hint hata diya gaya hai.
+          // Upar right corner — sirf icons wali pill: wifi icon + three-dot.
+          // Koi text nahi, dono icons bare.
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 16,
-            right: 16,
-            child: _TopHeader(
-              connected: conn.state == ConnState.connected,
-              state: conn.state,
-              onStatusTap: () => _reconnect(context, settings),
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 18,
+            child: _TopPill(
+              connected: connected,
+              onOsTap: connected
+                  ? null
+                  : () => _reconnect(context, settings),
+              onMoreTap: () => showMouseControlsSheet(context),
             ),
           ),
         ],
@@ -77,201 +84,57 @@ class HomePage extends StatelessWidget {
   }
 }
 
-/// Upar wala khubsurat header — poora card, neeche lime line.
-///
-/// Andar: logo + MOUSIFY + PC Touchpad, right par connection dot,
-/// aur uske neeche plain text me instructions — koi glass pill nahi.
-class _TopHeader extends StatelessWidget {
+/// Upar right corner — sirf icons wali pill: wifi icon + three-dot.
+/// Koi text nahi — na "Offline", na OS naam. Dono icons bare hain.
+/// Flat matte gray — koi border line, koi shadow nahi.
+class _TopPill extends StatelessWidget {
   final bool connected;
-  final ConnState state;
-  final VoidCallback onStatusTap;
+  final VoidCallback? onOsTap;
+  final VoidCallback onMoreTap;
 
-  const _TopHeader({
+  const _TopPill({
     required this.connected,
-    required this.state,
-    required this.onStatusTap,
+    required this.onOsTap,
+    required this.onMoreTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1B1B1D), Color(0xFF0E0E0F)],
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Lime logo square — chhota, halka
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(11),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.30),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.touch_app_rounded,
-                  color: Colors.black,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'MOUSIFY',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.6,
-                        color: Colors.white,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      connected ? 'PC Touchpad  •  Connected' : 'PC Touchpad  •  Offline',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: connected
-                            ? Colors.white.withValues(alpha: 0.65)
-                            : Colors.white.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _StatusDot(state: state, onTap: onStatusTap),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Lime divider
-          Container(
-            height: 2,
-            width: 32,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Instructions — plain text, koi glass pill nahi
-          const Row(
-            children: [
-              _HintItem(icon: Icons.open_with_rounded, text: 'Drag to move'),
-              _HintDot(),
-              _HintItem(icon: Icons.touch_app_rounded, text: 'Tap to click'),
-              _HintDot(),
-              _HintItem(icon: Icons.keyboard_rounded, text: 'Double-tap to type'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HintDot extends StatelessWidget {
-  const _HintDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Container(
-        width: 3,
-        height: 3,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.35),
-        ),
-      ),
-    );
-  }
-}
-
-class _HintItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _HintItem({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.6)),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.65),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Chhota connection dot — connected par green, warna hollow. Tap = reconnect.
-class _StatusDot extends StatelessWidget {
-  final ConnState state;
-  final VoidCallback onTap;
-
-  const _StatusDot({required this.state, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final connected = state == ConnState.connected;
-    return GestureDetector(
-      onTap: connected ? null : onTap,
+    final wifiIcon = GestureDetector(
+      onTap: onOsTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 28,
-        height: 28,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: connected ? 9 : 7,
-            height: connected ? 9 : 7,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: connected ? AppColors.live : Colors.transparent,
-              border: connected
-                  ? null
-                  : Border.all(color: Colors.white38, width: 1.4),
+      child: Icon(
+        connected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+        color: connected
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.45),
+        size: 26,
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        // Poori tarah rounded — sideon se gol pill jaisa.
+        borderRadius: BorderRadius.circular(26),
+        color: AppColors.surfaceGray,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          wifiIcon,
+          // Wifi icon aur three dots ke beech kafi gap.
+          const SizedBox(width: 30),
+          GestureDetector(
+            onTap: onMoreTap,
+            behavior: HitTestBehavior.opaque,
+            child: const Icon(
+              Icons.more_horiz_rounded,
+              color: Colors.white,
+              size: 28,
             ),
           ),
-        ),
+        ],
       ),
     );
   }

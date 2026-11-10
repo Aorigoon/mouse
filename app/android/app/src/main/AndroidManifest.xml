@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- ws:// (bina TLS) LAN connections allow karo -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Voice typing (speech-to-text) ke liye mic -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Shake-to-open: foreground service (app band ho to bhi shake detect) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>

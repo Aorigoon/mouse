@@ -5,9 +5,16 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const live = Color(0xFF22C55E);
 
-  /// Aorigoon lime — floating nav ke active pill aur highlights ke liye.
-  static const accent = Color(0xFFD6FF3F);
-  static const accentGlow = Color(0xFFB8E62E);
+  /// App accent — white (Zain: lime ki jagah white). Floating nav ki
+  /// active pill aur highlights ke liye.
+  static const accent = Color(0xFFFFFFFF);
+
+  /// Kaale touchpad par gray surfaces — chips aur bottom nav ke liye.
+  /// Flat matte dark gray, koi border line ya gloss nahi.
+  static const surfaceGray = Color(0xFF262628);
+
+  /// Royal blue — speed controls (dial, sliders) ke liye.
+  static const royalBlue = Color(0xFF4169E1);
 }
 
 /// Light default, dark available. Primary = black (light) / white (dark).
@@ -69,6 +76,7 @@ class AppTheme {
         centerTitle: true,
         titleTextStyle: TextStyle(
           color: scheme.onSurface,
+          fontFamily: 'Roboto',
           fontSize: 16.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,

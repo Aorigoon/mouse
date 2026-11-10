@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
+import '../utils/motion_control.dart';
 import '../utils/shake.dart';
 import '../utils/shake_service.dart';
 import '../widgets/floating_nav_bar.dart';
@@ -27,6 +28,8 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   final _pageController = PageController();
   ShakeDetector? _shake;
+  MotionController? _motion;
+  AppSettings? _settings;
   int _shakeCount = 0;
   Timer? _shakeResetTimer;
 
@@ -48,10 +51,15 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _shake?.stop();
+    _settings?.removeListener(_syncMotion);
+    _motion?.dispose();
     _pageController.dispose();
     _shakeResetTimer?.cancel();
     super.dispose();
   }
+
+  /// Motion Control toggle badle to controller sync karo.
+  void _syncMotion() => _motion?.sync();
 
   void _onShake() {
     setState(() {
@@ -82,6 +90,11 @@ class _HomeShellState extends State<HomeShell> {
     final settings = context.read<AppSettings>();
     final conn = context.read<MousifyConnection>();
     conn.onTokenPaired = settings.setToken;
+    // Motion Control — sheet ka toggle badle to turant on/off.
+    _settings = settings;
+    _motion = MotionController(conn: conn, settings: settings);
+    settings.addListener(_syncMotion);
+    _motion!.sync();
     settings.loaded.then((_) {
       if (!mounted) return;
       final host = settings.host;

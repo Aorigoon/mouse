@@ -39,6 +39,7 @@ class MousifyConnection extends ChangeNotifier {
   String? host;
   int port = 9898;
   String? hostName; // PC ka naam — server batata hai
+  String? osName; // PC ka OS — server batata hai (Windows/Fedora/Ubuntu)
   String? lastError;
 
   /// Pairing complete hone par naya token wapas settings ko milta hai.
@@ -115,6 +116,7 @@ class MousifyConnection extends ChangeNotifier {
     switch (msg['t']) {
       case 'hello-ok':
         hostName = msg['host'] as String?;
+        osName = msg['os'] as String?;
         _setState(ConnState.connected);
         _startPing();
         break;
@@ -122,6 +124,7 @@ class MousifyConnection extends ChangeNotifier {
         _token = msg['token'] as String?;
         _pairCode = null;
         hostName = msg['host'] as String?;
+        osName = msg['os'] as String?;
         if (_token != null) onTokenPaired?.call(_token!);
         _setState(ConnState.connected);
         _startPing();
@@ -180,6 +183,7 @@ class MousifyConnection extends ChangeNotifier {
     _sub?.cancel();
     _channel?.sink.close();
     _channel = null;
+    osName = null;
     _setState(ConnState.disconnected);
   }
 

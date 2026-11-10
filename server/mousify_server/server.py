@@ -8,6 +8,7 @@ import asyncio
 import base64
 import json
 import logging
+import platform
 import secrets
 import socket
 import time
@@ -22,6 +23,55 @@ log = logging.getLogger("mousify.server")
 HELLO_TIMEOUT = 5.0
 MAX_TEXT_LEN = 200_000
 
+# /etc/os-release ke ID se display naam — phone par chip me dikhta hai.
+_LINUX_DISTROS = {
+    "fedora": "Fedora",
+    "ubuntu": "Ubuntu",
+    "debian": "Debian",
+    "arch": "Arch Linux",
+    "pop": "Pop!_OS",
+    "manjaro": "Manjaro",
+    "opensuse": "openSUSE",
+    "linuxmint": "Linux Mint",
+    "elementary": "elementary OS",
+    "zorin": "Zorin OS",
+    "kali": "Kali Linux",
+    "rhel": "RHEL",
+    "centos": "CentOS",
+    "almalinux": "AlmaLinux",
+    "rocky": "Rocky Linux",
+}
+
+
+def detect_os() -> str:
+    """PC ka OS naam — Windows / macOS / Fedora / Ubuntu / ..."""
+    system = platform.system()
+    if system == "Windows":
+        return "Windows"
+    if system == "Darwin":
+        return "macOS"
+    if system == "Linux":
+        try:
+            fields = {}
+            for line in Path("/etc/os-release").read_text().splitlines():
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    fields[k.strip()] = v.strip().strip('"')
+            distro_id = fields.get("ID", "").lower()
+            if distro_id in _LINUX_DISTROS:
+                return _LINUX_DISTROS[distro_id]
+            name = fields.get("NAME", "")
+            # "Fedora Linux" -> Fedora, "Debian GNU/Linux" -> Debian
+            for suffix in (" GNU/Linux", " Linux"):
+                if name.endswith(suffix):
+                    name = name[: -len(suffix)]
+            if name:
+                return name
+        except OSError:
+            pass
+        return "Linux"
+    return system or "Unknown"
+
 
 class MousifyServer:
     def __init__(self, injector: Injector | MockInjector, port: int = config.DEFAULT_PORT) -> None:
@@ -29,6 +79,7 @@ class MousifyServer:
         self.port = port
         self.icon_port = port + 1
         self.host_name = socket.gethostname()
+        self.os_name = detect_os()
         self.apps = AppRegistry()
         self.clients: set = set()
 
@@ -45,14 +96,14 @@ class MousifyServer:
 
         token = config.load_token()
         if token and msg.get("token") == token:
-            await ws.send(json.dumps({"t": "hello-ok", "host": self.host_name}))
+            await ws.send(json.dumps({"t": "hello-ok", "host": self.host_name, "os": self.os_name}))
             return True
 
         if msg.get("pair_code") and config.check_pair_code(msg["pair_code"]):
             # Har pairing par naya token (purane clients disconnect ho jayenge)
             token = secrets.token_hex(16)
             config.save_token(token)
-            await ws.send(json.dumps({"t": "paired", "token": token, "host": self.host_name}))
+            await ws.send(json.dumps({"t": "paired", "token": token, "host": self.host_name, "os": self.os_name}))
             return True
 
         await ws.send(json.dumps({"t": "pair-required"}))

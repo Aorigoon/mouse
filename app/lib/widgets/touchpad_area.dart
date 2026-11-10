@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
+import '../theme.dart';
 import '../views/composer_page.dart';
 
 /// Plain black touchpad:
@@ -297,17 +298,10 @@ class _RightClickButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.09),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        // Flat matte gray, chips jaisa — koi border line, koi shadow nahi.
+        color: AppColors.surfaceGray,
       ),
       child: Material(
         color: Colors.transparent,

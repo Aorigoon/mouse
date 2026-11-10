@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme.dart';
+
 /// Floating rounded bottom navigation — Mousify ka naya premium nav.
 ///
-/// • Screen se upar floating pill, dono taraf gap, poora rounded (36px)
+/// • Patla aur chota pill: height 54, content ko tight hug karta hai —
+///   gray background sirf icons ke aas paas, sideon par extra gap nahi
+///   (lime pill ke peeche bhi sirf halki si jagah)
+/// • Gray pill, white icons — black par gray modern lagta hai
+/// • Icons paas paas: compact centered row, koi Expanded quarters nahi —
+///   warna Mouse se Apps tak ka faasla bohot zyada lagta hai
 /// • Active tab: lime pill + black icon + label
-/// • Inactive tab: soft grey rounded icon, sirf icon (label chhota)
-/// • Glassy shadow + halki border, light/dark dono me khubsurat
+/// • Inactive tab: soft grey-white icon, sirf icon
+/// • Glassy shadow + halki border
 class FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -42,51 +49,41 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      height: 72,
-      margin: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).padding.bottom + 14,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(36),
-        color: isDark
-            ? const Color(0xFF1C1C1E).withValues(alpha: 0.92)
-            : Colors.white.withValues(alpha: 0.94),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.10)
-              : Colors.black.withValues(alpha: 0.06),
+    // Pill content ko tight hug kare: Align + min Row — koi fixed
+    // side margin nahi, warna gray background sideon se bada lagta hai.
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        height: 54,
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 12,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.55 : 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(27),
+        // Dono themes me gray — black par gray modern lagta hai.
+        // Flat matte: koi border line, koi shadow/gloss nahi.
+        color: AppColors.surfaceGray,
       ),
+      // Icons paas paas, center me: Expanded quarters hataye — warna
+      // icons ek dusre se bohot door bikhre hue lagte hain.
       child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          for (var i = 0; i < _items.length; i++)
-            Expanded(child: _NavButton(
+          for (var i = 0; i < _items.length; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            _NavButton(
               item: _items[i],
               selected: i == currentIndex,
               onTap: () {
                 HapticFeedback.selectionClick();
                 onTap(i);
               },
-            )),
+            ),
+          ],
         ],
+      ),
       ),
     );
   }
@@ -117,9 +114,6 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
-
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -128,43 +122,33 @@ class _NavButton extends StatelessWidget {
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
           padding: EdgeInsets.symmetric(
-            horizontal: selected ? 16 : 12,
-            vertical: 10,
+            horizontal: selected ? 10 : 8,
+            vertical: 8,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(20),
             color: selected
-                ? const Color(0xFFD6FF3F)
+                ? AppColors.accent
                 : Colors.transparent,
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFD6FF3F)
-                          .withValues(alpha: 0.38),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+            // Active pill par koi glow/shadow nahi — flat white.
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 selected ? item.activeIcon : item.icon,
-                size: 24,
+                size: 22,
+                // Gray pill par inactive icons halke white
                 color: selected
                     ? Colors.black
-                    : (isDark
-                        ? Colors.white.withValues(alpha: 0.55)
-                        : Colors.black.withValues(alpha: 0.45)),
+                    : Colors.white.withValues(alpha: 0.55),
               ),
               if (selected) ...[
-                const SizedBox(width: 7),
+                const SizedBox(width: 6),
                 Text(
                   item.label,
                   style: const TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
                     color: Colors.black,

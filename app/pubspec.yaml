@@ -42,6 +42,9 @@ dependencies:
   sensors_plus: ^7.1.0
   flutter_foreground_task: ^11.0.3
   path_provider: ^2.1.3
+  # Voice typing — Google ki speech recognition (Android par system wali,
+  # bilkul free, koi API key ya limit nahi).
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:
