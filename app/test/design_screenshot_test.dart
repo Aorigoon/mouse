@@ -4,6 +4,8 @@ import 'package:mousify/main.dart';
 import 'package:mousify/views/composer_page.dart';
 import 'package:mousify/views/dock_page.dart';
 import 'package:mousify/widgets/apps_grid_icon.dart';
+import 'package:mousify/widgets/floating_nav_bar.dart';
+import 'package:mousify/widgets/quick_tools_stick.dart';
 import 'package:mousify/widgets/toolbox_icon.dart';
 import 'package:mousify/widgets/touchpad_area.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,12 +43,56 @@ void main() {
     expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
     expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
     expect(find.byType(AppsGridIcon), findsOneWidget);
-    expect(find.byType(ToolboxIcon), findsOneWidget);
+    // ToolboxIcon ab do jagah hai — nav Tools tab + quick-tools trigger.
+    expect(
+      find.descendant(
+        of: find.byType(FloatingNavBar),
+        matching: find.byType(ToolboxIcon),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(QuickToolsStick),
+        matching: find.byType(ToolboxIcon),
+      ),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.settings_suggest_rounded), findsOneWidget);
 
     await expectLater(
       find.byType(MousifyApp),
       matchesGoldenFile('goldens/home.png'),
+    );
+  });
+
+  testWidgets('real design screenshot - quick tools stick',
+      (tester) async {
+    // Home page par neeche-right wala toolbox button — tap par
+    // YAHI pill seedha upar expand hoti hai (koi alag partition
+    // nahi, 54 chaudi, 5 tool icons, neeche cross (X), koi text
+    // nahi). Ye golden stick ki khuli hui haalat dikhata hai.
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byKey(const Key('quick-tools-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('tool-select-all')), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/quick_tools_stick.png'),
     );
   });
 

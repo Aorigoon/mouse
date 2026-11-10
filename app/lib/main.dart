@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'auth/auth_service.dart';
 import 'connection/server_connection.dart';
 import 'connection/settings_store.dart';
+import 'connection/windows.dart';
 import 'theme.dart';
 import 'views/home_shell.dart';
 
@@ -21,6 +22,11 @@ class MousifyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AppSettings()),
         ChangeNotifierProvider(create: (_) => MousifyConnection()),
         ChangeNotifierProvider(create: (_) => AuthService()),
+        // WindowsService ko connection chahiye — upar wali provider
+        // se leta hai (create order me pehle aati hai).
+        ChangeNotifierProvider(
+          create: (ctx) => WindowsService(ctx.read<MousifyConnection>()),
+        ),
       ],
       child: Consumer<AppSettings>(
         builder: (context, settings, _) {

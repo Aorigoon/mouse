@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
+import '../connection/windows.dart';
 import 'shot_page.dart';
 
 /// Tools — khoobsurat card-based design. Media transport, volume,
@@ -21,8 +22,6 @@ class _ToolsPageState extends State<ToolsPage> {
   late final MousifyConnection _conn;
   StreamSubscription? _sub;
   double? _volume;
-  List<Map<String, String>> _windows = [];
-  bool _windowsLoading = false;
 
   @override
   void initState() {
@@ -62,20 +61,6 @@ class _ToolsPageState extends State<ToolsPage> {
           );
         }
         break;
-      case 'windows':
-        final list = (msg['windows'] as List? ?? [])
-            .map((w) => {
-                  'app': w['app'] as String? ?? '',
-                  'title': w['title'] as String? ?? '',
-                })
-            .toList();
-        if (mounted) {
-          setState(() {
-            _windows = List<Map<String, String>>.from(list);
-            _windowsLoading = false;
-          });
-        }
-        break;
       default:
         break;
     }
@@ -84,7 +69,7 @@ class _ToolsPageState extends State<ToolsPage> {
   void _request() {
     if (!_conn.isReady) return;
     _conn.send({'t': 'volume-get'});
-    _conn.send({'t': 'windows-list'});
+    context.read<WindowsService>().refresh();
   }
 
   void _media(String action) {
@@ -124,6 +109,7 @@ class _ToolsPageState extends State<ToolsPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final conn = context.watch<MousifyConnection>();
+    final windowsService = context.watch<WindowsService>();
     final vol = _volume ?? 0;
 
     return Scaffold(
@@ -280,6 +266,8 @@ class _ToolsPageState extends State<ToolsPage> {
           const SizedBox(height: 16),
 
           // ================= WINDOWS =================
+          // List shared WindowsService se aati hai (home page ka
+          // focus button bhi yahi use karta hai).
           _SectionLabel('WINDOWS — TAP TO SWITCH'),
           _Card(
             child: Column(
@@ -289,18 +277,18 @@ class _ToolsPageState extends State<ToolsPage> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
-                        _windows.isEmpty
+                        windowsService.windows.isEmpty
                             ? (conn.isReady
                                 ? 'Refresh dabao — khuli windows yahan'
                                 : 'Not connected')
-                            : 'PC par ${_windows.length} windows khuli hain',
+                            : 'PC par ${windowsService.windows.length} windows khuli hain',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                    _windowsLoading
+                    windowsService.loading
                         ? const Padding(
                             padding: EdgeInsets.all(10),
                             child: SizedBox(
@@ -312,23 +300,19 @@ class _ToolsPageState extends State<ToolsPage> {
                         : IconButton(
                             tooltip: 'Refresh',
                             icon: const Icon(Icons.refresh, size: 20),
-                            onPressed: () => _conn.send({'t': 'windows-list'}),
+                            onPressed: () => windowsService.refresh(),
                           ),
                   ],
                 ),
-                if (_windows.isNotEmpty) ...[
+                if (windowsService.windows.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  for (final w in _windows)
+                  for (final w in windowsService.windows)
                     _WindowRow(
-                      app: w['app']!,
-                      title: w['title']!,
+                      app: w.app,
+                      title: w.title,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        _conn.send({
-                          't': 'focus-window',
-                          'app': w['app'],
-                          'title': w['title'],
-                        });
+                        windowsService.focus(w);
                       },
                     ),
                 ] else if (conn.isReady) ...[

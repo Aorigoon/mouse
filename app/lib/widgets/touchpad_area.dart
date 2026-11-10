@@ -8,6 +8,7 @@ import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../theme.dart';
 import '../views/composer_page.dart';
+import 'quick_tools_stick.dart';
 
 /// Plain black touchpad:
 ///   • 1 finger drag          → cursor move
@@ -218,6 +219,13 @@ class _TouchpadAreaState extends State<TouchpadArea> {
           right: 20,
           bottom: 118,
           child: _RightClickButton(onTap: _rightClick),
+        ),
+        // Quick-tools stick — right-click button ke upar. Tap par
+        // stick ki tarah seedha upar expand hoti hai (54 chaudi).
+        const Positioned(
+          right: 20,
+          bottom: 184,
+          child: QuickToolsStick(),
         ),
       ],
     );

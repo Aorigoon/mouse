@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -165,11 +167,40 @@ class _GuideChip extends StatefulWidget {
 
 class _GuideChipState extends State<_GuideChip> {
   bool _expanded = false;
+  bool _contentVisible = false;
   bool _pressed = false;
+  Timer? _collapseTimer;
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
 
   void _toggle() {
     HapticFeedback.selectionClick();
-    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      // Band: pehle content fade + scale-out (300ms), phir box
+      // shrink (200ms baad — content tab tak taqreeban gayab).
+      // Pehle content achanak gayab ho jata tha, koi animation
+      // nahi lagti thi — ab dono taraf animation hai.
+      _collapseTimer?.cancel();
+      setState(() => _contentVisible = false);
+      _collapseTimer = Timer(const Duration(milliseconds: 200), () {
+        if (mounted) setState(() => _expanded = false);
+      });
+    } else {
+      // Kholo: box grow + content fade + scale-in (opacity 0 se
+      // start, agle frame par 1 — enter look pehle jaisa hi).
+      _collapseTimer?.cancel();
+      setState(() {
+        _expanded = true;
+        _contentVisible = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _contentVisible = true);
+      });
+    }
   }
 
   @override
@@ -212,8 +243,24 @@ class _GuideChipState extends State<_GuideChip> {
               borderRadius: BorderRadius.circular(_expanded ? 20 : 24),
               color: AppColors.raised(isDark).withValues(alpha: 0.88),
             ),
+            // Content — staged: khulne par fade + 0.94 se 1.0 scale-in
+            // (enter look pehle jaisa), band hone par fade + scale-out
+            // (pehle content achanak gayab ho jata tha). Box tab
+            // shrink hota hai jab content taqreeban gayab ho — is liye
+            // koi overflow nahi (content chhoti box me layout nahi hota).
             child: _expanded
-                ? _GuideExpandedAnimated(ink: ink)
+                ? AnimatedOpacity(
+                    opacity: _contentVisible ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedScale(
+                      scale: _contentVisible ? 1.0 : 0.94,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topLeft,
+                      child: _GuideExpanded(ink: ink),
+                    ),
+                  )
                 : Center(
                     child: Icon(
                       Icons.touch_app_rounded,
@@ -224,37 +271,6 @@ class _GuideChipState extends State<_GuideChip> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Expanded guide ka enter animation — fade + halka scale-in.
-///
-/// TweenAnimationBuilder insert hote hi 0 se 1 tak animate karta
-/// hai, is liye content achanak nahi aata, khubsurat tareeke se
-/// khulta hai (opacity + 0.94 se 1.0 scale, 350ms easeOutCubic).
-class _GuideExpandedAnimated extends StatelessWidget {
-  final Color ink;
-
-  const _GuideExpandedAnimated({required this.ink});
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      builder: (context, t, child) {
-        return Opacity(
-          opacity: t,
-          child: Transform.scale(
-            scale: 0.94 + 0.06 * t,
-            alignment: Alignment.topLeft,
-            child: child,
-          ),
-        );
-      },
-      child: _GuideExpanded(ink: ink),
     );
   }
 }
