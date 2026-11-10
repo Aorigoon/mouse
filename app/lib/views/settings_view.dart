@@ -146,6 +146,9 @@ class _SettingsViewState extends State<SettingsView> {
         },
       ),
     );
+    // Dialog band ho (Cancel/back/tap-outside) to keyboard bhi
+    // band ho — autofocus wala number field focus na rakhe.
+    if (mounted) FocusScope.of(context).unfocus();
     codeController.dispose();
   }
 
@@ -469,12 +472,13 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 0),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+    // Material (Container nahi) — andar ke ListTile ki ink splash
+    // DecoratedBox ke peeche chhup jati hai, warna framework error aata hai.
+    return Material(
+      color: scheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+        side: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,

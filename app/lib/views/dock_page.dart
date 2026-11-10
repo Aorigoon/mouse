@@ -499,11 +499,14 @@ class _Message extends StatelessWidget {
   }
 }
 
-/// Beautiful floating search bar for Apps page.
-/// - Red "search bar" text
-/// - No yellow underline
-/// - Floats up slightly above keyboard when focused
-/// - Transparent sides, compact, not attached to nav bar
+/// Beautiful floating search bar for Apps page — center me, bottom
+/// navigation ke upar, khubsurat tareeke se.
+///
+/// - Centered pill (unfocused) — tap par smoothly full width ho jata hai.
+/// - Focus par halka sa upar uthta hai aur shadow gehra hota hai;
+///   keyboard khule to Scaffold resize ki wajah se bar keyboard ke
+///   upar overlay rehta hai (neeche nahi dhasakta).
+/// - Hint "Search apps" — proper hint color (pehle red tha, wo bug tha).
 class _BeautifulSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -523,51 +526,27 @@ class _BeautifulSearchBar extends StatefulWidget {
 
 class _BeautifulSearchBarState extends State<_BeautifulSearchBar>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  late final Animation<double> _translateAnimation;
-  late final Animation<double> _scaleAnimation;
-  late final Animation<double> _shadowAnimation;
-  late final Animation<double> _widthAnimation;
+  late final AnimationController _focusController;
+  late final Animation<double> _expand;
+  late final Animation<double> _lift;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 250),
+    _focusController = AnimationController(
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
-
-    _translateAnimation = Tween<double>(
-      begin: 0,
-      end: -80, // Float up slightly above keyboard (not too far)
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _shadowAnimation = Tween<double>(
-      begin: 0.08,
-      end: 0.25,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _widthAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.96, // Slightly narrower when floating
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+    // Ek hi curve poori animation me — smooth, koi jhatka nahi.
+    final curved = CurvedAnimation(
+      parent: _focusController,
+      curve: Curves.easeInOutCubic,
+    );
+    // Focus par bar chauda ho (centered pill se full width tak).
+    _expand = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
+    // Focus par halka sa upar uthe — zyada nahi, bas float jaisa.
+    _lift = Tween<double>(begin: 0.0, end: -6.0).animate(curved);
+    if (widget.isFocused) _focusController.value = 1.0;
   }
 
   @override
@@ -575,16 +554,16 @@ class _BeautifulSearchBarState extends State<_BeautifulSearchBar>
     super.didUpdateWidget(oldWidget);
     if (widget.isFocused != oldWidget.isFocused) {
       if (widget.isFocused) {
-        _animationController.forward();
+        _focusController.forward();
       } else {
-        _animationController.reverse();
+        _focusController.reverse();
       }
     }
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _focusController.dispose();
     super.dispose();
   }
 
@@ -592,93 +571,77 @@ class _BeautifulSearchBarState extends State<_BeautifulSearchBar>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hasText = widget.controller.text.isNotEmpty;
+    final screenW = MediaQuery.of(context).size.width;
+    // Centered pill (unfocused) se full width (focused) tak.
+    final narrowW = (screenW - 140).clamp(0.0, 280.0);
+    final wideW = screenW - 32;
 
     return AnimatedBuilder(
-      animation: _animationController,
+      animation: _focusController,
       builder: (context, child) {
+        final w = narrowW + (wideW - narrowW) * _expand.value;
         return Transform.translate(
-          offset: Offset(0, _translateAnimation.value),
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            alignment: Alignment.bottomCenter,
-            child: SizedBox(
-              width: double.infinity,
-              child: Center(
-                child: Container(
-                  width: MediaQuery.of(context).size.width * 0.92 * _widthAnimation.value,
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    // Semi-transparent background - sides will show through
-                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.85),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: _shadowAnimation.value),
-                        blurRadius: 24,
-                        offset: const Offset(0, -8),
-                        spreadRadius: 1,
-                      ),
-                    ],
-                    border: Border.all(
-                      color: widget.isFocused
-                          ? scheme.primary.withValues(alpha: 0.6)
-                          : scheme.outline.withValues(alpha: 0.2),
-                      width: widget.isFocused ? 1.5 : 1,
-                    ),
-                  ),
-                  child: TextField(
-                    controller: widget.controller,
-                    focusNode: widget.focusNode,
-                    onChanged: (_) => setState(() {}),
-                    style: TextStyle(
-                      color: scheme.onSurface,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'search bar',
-                      hintStyle: TextStyle(
-                        color: Colors.red, // Red color for "search bar" text
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.2,
-                      ),
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.only(left: 14, right: 10),
-                        child: Icon(
-                          Icons.search_rounded,
-                          size: 22,
-                          color: widget.isFocused
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      suffixIcon: hasText
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.close_rounded,
-                                size: 20,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                              onPressed: widget.onClear,
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 14,
-                      ),
-                      filled: true,
-                      fillColor: Colors.transparent,
-                    ),
-                    cursorColor: scheme.primary,
-                    cursorWidth: 2,
-                  ),
+          offset: Offset(0, _lift.value),
+          child: Center(
+            child: Container(
+              width: w,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                // Flat matte — koi shadow nahi, koi border nahi.
+                color:
+                    scheme.surfaceContainerHighest.withValues(alpha: 0.92),
+              ),
+              child: TextField(
+                controller: widget.controller,
+                focusNode: widget.focusNode,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
                 ),
+                decoration: InputDecoration(
+                  hintText: 'Search apps',
+                  hintStyle: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 10),
+                    child: Icon(
+                      Icons.search_rounded,
+                      size: 22,
+                      color: widget.isFocused
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  suffixIcon: hasText
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          onPressed: widget.onClear,
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 14,
+                  ),
+                  filled: true,
+                  fillColor: Colors.transparent,
+                ),
+                cursorColor: scheme.primary,
+                cursorWidth: 2,
               ),
             ),
           ),

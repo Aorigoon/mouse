@@ -144,6 +144,8 @@ class _HomeShellState extends State<HomeShell> {
 
   void _goToMouse() {
     if (!mounted) return;
+    // Settings ke field par focus ho to keyboard band karo.
+    FocusManager.instance.primaryFocus?.unfocus();
     Navigator.of(context).popUntil((r) => r.isFirst);
     setState(() => _index = 0);
     _pageController.animateToPage(
@@ -181,6 +183,9 @@ class _HomeShellState extends State<HomeShell> {
                   : const ClampingScrollPhysics(),
               onPageChanged: (i) {
                 HapticFeedback.selectionClick();
+                // Tab badla — pichle tab ka field (Settings IP/port)
+                // focus na rakhe, warna keyboard touchpad par khula rehta hai.
+                FocusManager.instance.primaryFocus?.unfocus();
                 setState(() => _index = i);
               },
               children: const [
@@ -207,6 +212,9 @@ class _HomeShellState extends State<HomeShell> {
 
   void _goTo(int i) {
     HapticFeedback.selectionClick();
+    // Tab badla — pichle tab ka field (Settings IP/port) focus na
+    // rakhe, warna keyboard touchpad par khula rehta hai.
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _index = i);
     _pageController.animateToPage(
       i,

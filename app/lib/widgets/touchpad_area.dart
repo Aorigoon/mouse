@@ -189,6 +189,7 @@ class _TouchpadAreaState extends State<TouchpadArea> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Stack(
       children: [
         Positioned.fill(
@@ -199,7 +200,8 @@ class _TouchpadAreaState extends State<TouchpadArea> {
             onPointerUp: _onUp,
             onPointerCancel: _onCancel,
             child: Container(
-              color: Colors.black,
+              // Theme surface — dark par black, light par white.
+              color: scheme.surface,
               child: AnimatedBuilder(
                 animation: Listenable.merge([_touch, _scrolling]),
                 builder: (context, _) => CustomPaint(
@@ -222,46 +224,52 @@ class _TouchpadAreaState extends State<TouchpadArea> {
   }
 }
 
-/// Finger ke neeche halka glow + dot + chhoti line.
+/// Touchpad dot grid — Zain ki reference image jaisi.
+///
+/// Finger dabao to poore touchpad par dots ki grid nazar aati hai:
+/// finger ke qareeb dots bade aur gehre royal blue, bahar ki taraf
+/// chhote aur halke — reference image se thode chhote. Finger uthe
+/// to grid gayab (pad bilkul saaf). Background dark mode me pure
+/// black rehta hai. Scroll mode ke up/down chevrons royal blue
+/// rehte hain.
 class _TouchPainter extends CustomPainter {
   final Offset? touch;
   final bool scrolling;
 
   const _TouchPainter({required this.touch, required this.scrolling});
 
+  // Grid spacing aur dot size — reference image se thode chhote.
+  static const _spacing = 26.0;
+  static const _influence = 180.0;
+  static const _minRadius = 1.0;
+  static const _maxRadius = 3.5;
+  static const _minAlpha = 0.10;
+  static const _maxAlpha = 0.90;
+
   @override
   void paint(Canvas canvas, Size size) {
     final t = touch;
     if (t == null) return;
 
-    final glow = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.white.withValues(alpha: scrolling ? 0.16 : 0.09),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: t, radius: 70));
-    canvas.drawCircle(t, 70, glow);
-
-    canvas.drawCircle(
-      t,
-      4.5,
-      Paint()..color = Colors.white.withValues(alpha: 0.9),
-    );
-
-    final line = Paint()
-      ..color = Colors.white.withValues(alpha: 0.55)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(t.dx - 14, t.dy),
-      Offset(t.dx + 14, t.dy),
-      line,
-    );
+    // Grid — har point par dot; finger se doori se size aur alpha.
+    for (var y = _spacing / 2; y < size.height; y += _spacing) {
+      for (var x = _spacing / 2; x < size.width; x += _spacing) {
+        final d = (Offset(x, y) - t).distance;
+        var f = (1 - d / _influence).clamp(0.0, 1.0);
+        f = f * f; // smooth falloff — center ke qareeb ghana
+        final r = _minRadius + (_maxRadius - _minRadius) * f;
+        final a = _minAlpha + (_maxAlpha - _minAlpha) * f;
+        canvas.drawCircle(
+          Offset(x, y),
+          r,
+          Paint()..color = AppColors.royalBlue.withValues(alpha: a),
+        );
+      }
+    }
 
     if (scrolling) {
       final chevron = Paint()
-        ..color = Colors.white.withValues(alpha: 0.75)
+        ..color = AppColors.royalBlue.withValues(alpha: 0.75)
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
@@ -297,11 +305,12 @@ class _RightClickButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         // Flat matte gray, chips jaisa — koi border line, koi shadow nahi.
-        color: AppColors.surfaceGray,
+        color: AppColors.raised(isDark),
       ),
       child: Material(
         color: Colors.transparent,
@@ -309,12 +318,12 @@ class _RightClickButton extends StatelessWidget {
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
-          child: const SizedBox(
+          child: SizedBox(
             width: 54,
             height: 54,
             child: Icon(
               Icons.ads_click_rounded,
-              color: Colors.white,
+              color: AppColors.ink(isDark),
               size: 23,
             ),
           ),

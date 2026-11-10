@@ -31,10 +31,13 @@ class _MouseSettingsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final ink = scheme.onSurface;
 
-    // Hamesha dark gray — flat matte, koi border line nahi.
+    // Dark gray / light raised — flat matte, koi border line nahi.
     return Material(
-      color: const Color(0xFF1C1C1E),
+      color: AppColors.chip(isDark),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -54,7 +57,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
+                      color: ink.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -66,12 +69,12 @@ class _MouseSettingsSheet extends StatelessWidget {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Settings',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: ink,
                         ),
                       ),
                       Align(
@@ -82,13 +85,13 @@ class _MouseSettingsSheet extends StatelessWidget {
                           child: Container(
                             width: 40,
                             height: 40,
-                            decoration: const BoxDecoration(
-                              color: AppColors.surfaceGray,
+                            decoration: BoxDecoration(
+                              color: AppColors.raised(isDark),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close_rounded,
-                              color: Colors.white,
+                              color: ink,
                               size: 20,
                             ),
                           ),
@@ -101,7 +104,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                 // Card with rows
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceGray,
+                    color: AppColors.raised(isDark),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Column(
@@ -115,16 +118,15 @@ class _MouseSettingsSheet extends StatelessWidget {
                           children: [
                             Icon(Icons.speed_rounded,
                                 size: 22,
-                                color:
-                                    Colors.white.withValues(alpha: 0.85)),
+                                color: ink.withValues(alpha: 0.85)),
                             const SizedBox(width: 14),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Mouse Speed',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white,
+                                  color: ink,
                                 ),
                               ),
                             ),
@@ -132,16 +134,23 @@ class _MouseSettingsSheet extends StatelessWidget {
                               settings.sensitivity.toStringAsFixed(1),
                               style: TextStyle(
                                 fontSize: 14,
-                                color:
-                                    Colors.white.withValues(alpha: 0.5),
+                                color: ink.withValues(alpha: 0.5),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: _SpeedSlider(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: _SpeedSlider(
+                          min: 0.5,
+                          max: 3.0,
+                          value: settings.sensitivity,
+                          onChanged: settings.setSensitivity,
+                          sliderKey: const Key('speed-slider'),
+                          tooltipKey: const Key('speed-tooltip'),
+                          trackKey: const Key('speed-slider-track'),
+                        ),
                       ),
                       _RowDivider(),
                       _SettingsRow(
@@ -149,11 +158,17 @@ class _MouseSettingsSheet extends StatelessWidget {
                         label: 'Motion Control',
                         trailing: Switch(
                           value: settings.motionControl,
-                          activeThumbColor: Colors.black,
-                          activeTrackColor: AppColors.accent,
-                          inactiveThumbColor: Colors.white,
+                          // Dark: white track + black thumb (approved).
+                          // Light: black track + white thumb.
+                          activeThumbColor:
+                              isDark ? Colors.black : Colors.white,
+                          activeTrackColor: isDark
+                              ? AppColors.accent
+                              : Colors.black,
+                          inactiveThumbColor:
+                              isDark ? Colors.white : Colors.black,
                           inactiveTrackColor:
-                              Colors.white.withValues(alpha: 0.2),
+                              ink.withValues(alpha: 0.2),
                           onChanged: (v) {
                             settings.setMotionControl(v);
                             HapticFeedback.selectionClick();
@@ -169,13 +184,13 @@ class _MouseSettingsSheet extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  const Expanded(
+                                  Expanded(
                                     child: Text(
                                       'Motion speed',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: ink,
                                       ),
                                     ),
                                   ),
@@ -190,12 +205,19 @@ class _MouseSettingsSheet extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              _BlueSlider(
-                                value: settings.motionSensitivity,
+                              _SpeedSlider(
                                 min: 0.5,
                                 max: 2.0,
-                                divisions: 15,
+                                value: settings.motionSensitivity,
                                 onChanged: settings.setMotionSensitivity,
+                                sliderKey:
+                                    const Key('motion-speed-slider'),
+                                tooltipKey: const Key(
+                                  'motion-speed-tooltip',
+                                ),
+                                trackKey: const Key(
+                                  'motion-speed-slider-track',
+                                ),
                               ),
                             ],
                           ),
@@ -220,7 +242,10 @@ class _RowDivider extends StatelessWidget {
     return Container(
       height: 1,
       margin: const EdgeInsets.only(left: 56),
-      color: Colors.white.withValues(alpha: 0.08),
+      color: Theme.of(context)
+          .colorScheme
+          .onSurface
+          .withValues(alpha: 0.08),
     );
   }
 }
@@ -230,95 +255,67 @@ class _SettingsRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final Widget trailing;
-  final VoidCallback? onTap;
 
   const _SettingsRow({
     required this.icon,
     required this.label,
     required this.trailing,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final ink = Theme.of(context).colorScheme.onSurface;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon,
-                  size: 22, color: Colors.white.withValues(alpha: 0.85)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: ink.withValues(alpha: 0.85)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: ink,
                 ),
               ),
-              trailing,
-            ],
-          ),
+            ),
+            trailing,
+          ],
         ),
       ),
     );
   }
 }
 
-/// Royal blue slider — speed controls ke liye.
-class _BlueSlider extends StatelessWidget {
-  final double value;
-  final double min;
-  final double max;
-  final int divisions;
-  final ValueChanged<double> onChanged;
-
-  const _BlueSlider({
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.divisions,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        activeTrackColor: AppColors.royalBlue,
-        inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
-        thumbColor: AppColors.royalBlue,
-        overlayColor: AppColors.royalBlue.withValues(alpha: 0.15),
-        trackHeight: 4,
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
-      ),
-      child: Slider(
-        value: value.clamp(min, max),
-        min: min,
-        max: max,
-        divisions: divisions,
-        onChanged: onChanged,
-      ),
-    );
-  }
-}
-
-/// Snail — gradient slider — rabbit (Mouse Speed control).
+/// Snail — gradient slider — rabbit (Mouse Speed aur Motion speed
+/// dono ke liye — ek hi style).
 ///
-/// Drag se speed badalti hai (0.5–3.0, 0.1 steps), value turant
+/// Drag se speed badalti hai (min–max, 0.1 steps), value turant
 /// lagti aur save hoti hai. Track par tap karo to thumb wahan
 /// animate hokar jata hai. Drag karte waqt thumb ke upar value
 /// wala bubble dikhta hai, chhorne ke thodi der baad gayab.
 class _SpeedSlider extends StatefulWidget {
-  const _SpeedSlider();
+  final double min;
+  final double max;
+  final double value;
+  final ValueChanged<double> onChanged;
+  final Key sliderKey;
+  final Key tooltipKey;
+  final Key trackKey;
+
+  const _SpeedSlider({
+    required this.min,
+    required this.max,
+    required this.value,
+    required this.onChanged,
+    required this.sliderKey,
+    required this.tooltipKey,
+    required this.trackKey,
+  });
 
   @override
   State<_SpeedSlider> createState() => _SpeedSliderState();
@@ -326,8 +323,6 @@ class _SpeedSlider extends StatefulWidget {
 
 class _SpeedSliderState extends State<_SpeedSlider>
     with SingleTickerProviderStateMixin {
-  static const double _min = 0.5;
-  static const double _max = 3.0;
   static const double _thumbRadius = 14.0;
 
   late final AnimationController _controller;
@@ -335,27 +330,28 @@ class _SpeedSliderState extends State<_SpeedSlider>
   Timer? _hideTimer;
   double _lastApplied = -1;
 
+  double get _min => widget.min;
+  double get _max => widget.max;
   double get _progress => _controller.value;
   double get _sensitivity => _min + _progress * (_max - _min);
 
   @override
   void initState() {
     super.initState();
-    final current = context.read<AppSettings>().sensitivity;
-    final initial = ((current - _min) / (_max - _min)).clamp(0.0, 1.0);
+    final initial = ((widget.value - _min) / (_max - _min)).clamp(0.0, 1.0);
     _controller = AnimationController(
       vsync: this,
       value: initial,
       duration: const Duration(milliseconds: 200),
     )..addListener(_onProgressChanged);
-    _lastApplied = current;
+    _lastApplied = widget.value;
   }
 
   void _onProgressChanged() {
     final snapped = (_sensitivity * 10).round() / 10;
     if (snapped != _lastApplied) {
       _lastApplied = snapped;
-      context.read<AppSettings>().setSensitivity(snapped);
+      widget.onChanged(snapped);
       HapticFeedback.selectionClick();
     }
     setState(() {});
@@ -391,13 +387,14 @@ class _SpeedSliderState extends State<_SpeedSlider>
 
   @override
   Widget build(BuildContext context) {
+    final ink = Theme.of(context).colorScheme.onSurface;
     return Row(
-      key: const Key('speed-slider'),
+      key: widget.sliderKey,
       children: [
-        const SizedBox(
+        SizedBox(
           width: 28,
           height: 28,
-          child: CustomPaint(painter: _SnailPainter()),
+          child: CustomPaint(painter: _SnailPainter(ink)),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -436,7 +433,7 @@ class _SpeedSliderState extends State<_SpeedSlider>
                             ),
                             child: Text(
                               _sensitivity.toStringAsFixed(1),
-                              key: const Key('speed-tooltip'),
+                              key: widget.tooltipKey,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -451,7 +448,7 @@ class _SpeedSliderState extends State<_SpeedSlider>
                     // icons bhi isi line par hain)
                     Positioned.fill(
                       child: GestureDetector(
-                        key: const Key('speed-slider-track'),
+                        key: widget.trackKey,
                         behavior: HitTestBehavior.opaque,
                         onHorizontalDragStart: (_) => _showTooltip(),
                         onHorizontalDragUpdate: (details) {
@@ -470,7 +467,7 @@ class _SpeedSliderState extends State<_SpeedSlider>
                         },
                         onTapUp: (_) => _scheduleHideTooltip(),
                         child: CustomPaint(
-                          painter: _SliderPainter(_progress),
+                          painter: _SliderPainter(_progress, ink),
                         ),
                       ),
                     ),
@@ -481,10 +478,10 @@ class _SpeedSliderState extends State<_SpeedSlider>
           ),
         ),
         const SizedBox(width: 14),
-        const SizedBox(
+        SizedBox(
           width: 28,
           height: 28,
-          child: CustomPaint(painter: _RabbitPainter()),
+          child: CustomPaint(painter: _RabbitPainter(ink)),
         ),
       ],
     );
@@ -494,8 +491,9 @@ class _SpeedSliderState extends State<_SpeedSlider>
 /// Gradient track + white thumb (video jaisa).
 class _SliderPainter extends CustomPainter {
   final double progress;
+  final Color ink;
 
-  const _SliderPainter(this.progress);
+  const _SliderPainter(this.progress, this.ink);
 
   static const _thumbRadius = 14.0;
 
@@ -513,7 +511,7 @@ class _SliderPainter extends CustomPainter {
     // Unfilled — halka gray
     canvas.drawRRect(
       track,
-      Paint()..color = Colors.white.withValues(alpha: 0.22),
+      Paint()..color = ink.withValues(alpha: 0.22),
     );
     // Filled — gradient (red → orange → yellow → green)
     final thumbX = _thumbRadius + progress * (size.width - 2 * _thumbRadius);
@@ -557,17 +555,19 @@ class _SliderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SliderPainter old) =>
-      old.progress != progress;
+      old.progress != progress || old.ink != ink;
 }
 
 /// Snail outline — slow side (video jaisa).
 class _SnailPainter extends CustomPainter {
-  const _SnailPainter();
+  final Color ink;
+
+  const _SnailPainter(this.ink);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round
@@ -592,23 +592,25 @@ class _SnailPainter extends CustomPainter {
     canvas.drawLine(const Offset(21, 17), const Offset(18.5, 12.5), paint);
     canvas.drawLine(const Offset(21, 17), const Offset(23.5, 12.5), paint);
     // Antennae tips
-    final dot = Paint()..color = Colors.white;
+    final dot = Paint()..color = ink;
     canvas.drawCircle(const Offset(18.5, 12.5), 1.3, dot);
     canvas.drawCircle(const Offset(23.5, 12.5), 1.3, dot);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(covariant _SnailPainter old) => old.ink != ink;
 }
 
 /// Rabbit outline — fast side (video jaisa).
 class _RabbitPainter extends CustomPainter {
-  const _RabbitPainter();
+  final Color ink;
+
+  const _RabbitPainter(this.ink);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round
@@ -621,5 +623,5 @@ class _RabbitPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(covariant _RabbitPainter old) => old.ink != ink;
 }

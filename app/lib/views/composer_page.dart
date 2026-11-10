@@ -60,6 +60,8 @@ class _ComposerPageState extends State<ComposerPage> {
     if (_isListening) {
       _speech.stop();
     }
+    // Focus chhodo taaki keyboard bhi band ho jaye (pop par bhi).
+    _focus.unfocus();
     _controller.removeListener(_onChanged);
     _focus.removeListener(_onFocusChanged);
     _controller.dispose();
@@ -225,6 +227,21 @@ class _ComposerPageState extends State<ComposerPage> {
   }
 
   /// Vertical three-dot par tap — Clear / Copy / Re-type wali bottom sheet.
+  /// Enter button — PC ko plain Enter keypress bhejo (jaise keyboard
+  /// ka Enter). Phone ke field ko nahi chhedo — sirf PC par Enter jata
+  /// hai, aur keyboard khula rehta hai taaki type karte raho.
+  void _sendEnter() {
+    final conn = context.read<MousifyConnection>();
+    if (!conn.isReady) {
+      _showSnack('Connect to your PC in Settings first');
+      return;
+    }
+    HapticFeedback.selectionClick();
+    conn.send({'t': 'key', 'k': 'enter'});
+    // Keyboard khula rahe — field par focus wapas lao.
+    _focus.requestFocus();
+  }
+
   void _showActionsSheet() {
     final hasText = _controller.text.isNotEmpty;
     HapticFeedback.selectionClick();
@@ -253,10 +270,14 @@ class _ComposerPageState extends State<ComposerPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final ink = scheme.onSurface;
 
     return Scaffold(
-      // Pura page gray hai — koi alag box nahi, koi white kinare nahi.
-      backgroundColor: scheme.surfaceContainerHighest,
+      // Dark: pura page gray (#141414, approved). Light: white page —
+      // chips (#F5F5F5) gray page par ghul jati hain, white par dikhti hain.
+      backgroundColor:
+          isDark ? scheme.surfaceContainerHighest : scheme.surface,
       body: Stack(
         children: [
           Column(
@@ -277,17 +298,15 @@ class _ComposerPageState extends State<ComposerPage> {
                         },
                         child: CustomPaint(
                           size: const Size(30, 24),
-                          painter: _BackArrowPainter(Colors.white),
+                          painter: _BackArrowPainter(ink),
                         ),
                       ),
-                      // Three dots (horizontal) — right side wali chip.
-                      _HeaderChip(
-                        onTap: _showActionsSheet,
-                        child: const Icon(
-                          Icons.more_horiz,
-                          size: 22,
-                          color: Colors.white,
-                        ),
+                      // Right side: ek hi lambi chip — Enter + three dots,
+                      // beech me gap, koi partition line nahi.
+                      _HeaderPill(
+                        onEnterTap: _sendEnter,
+                        onMoreTap: _showActionsSheet,
+                        ink: ink,
                       ),
                     ],
                   ),
@@ -315,9 +334,9 @@ class _ComposerPageState extends State<ComposerPage> {
                       fontSize: 17,
                       height: 1.7,
                     ),
-                    // Neeche 160px — bade oval button ke liye jagah,
+                    // Neeche 150px — bade oval button ke liye jagah,
                     // taaki aakhri line oval ke neeche na chhupe.
-                    contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 160),
+                    contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 150),
                     // Theme ka focused/enabled border bhi none.
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -395,29 +414,31 @@ class _VoiceMicChipState extends State<_VoiceMicChip>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final ink = scheme.onSurface;
     final micColor = widget.isListening
         ? const Color(0xFFFF453A)
-        : Colors.white;
+        : ink;
     return Material(
-      color: const Color(0xFF1C1C1E),
+      color: AppColors.chip(scheme.brightness == Brightness.dark),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(67),
+        borderRadius: BorderRadius.circular(60),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: widget.onTap,
         customBorder: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(67),
+          borderRadius: BorderRadius.circular(60),
         ),
         child: SizedBox(
           width: 250,
-          height: 134,
+          height: 120,
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CustomPaint(
-                  size: const Size(44, 56),
+                  size: const Size(36, 48),
                   painter: _CustomMicPainter(micColor),
                 ),
                 const SizedBox(height: 10),
@@ -427,23 +448,23 @@ class _VoiceMicChipState extends State<_VoiceMicChip>
                     children: [
                       _SoundBars(controller: _waveController),
                       const SizedBox(width: 10),
-                      const Text(
+                      Text(
                         'Listening…',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: ink,
                         ),
                       ),
                     ],
                   )
                 else
-                  const Text(
+                  Text(
                     'Tap to speak',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: ink,
                     ),
                   ),
               ],
@@ -470,23 +491,23 @@ class _CustomMicPainter extends CustomPainter {
     // Capsule — mic ka body (plain, andar koi line nahi).
     final body = Paint()..color = color;
     final capsule = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(11, 0, 22, 40),
-      const Radius.circular(11),
+      const Rect.fromLTWH(9, 0, 18, 34),
+      const Radius.circular(9),
     );
     canvas.drawRRect(capsule, body);
     // Rounded line — capsule ke niche U jaisi curve (back button
     // jaisi gol line), stroke, round caps. Gap capsule se sirf 3px.
-    // U horizontally chaudi hai (capsule se 12 zyada).
+    // U horizontally chaudi hai (capsule se 10 zyada).
     final line = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(
       Rect.fromCenter(
-        center: const Offset(22, 43),
-        width: 34,
-        height: 16,
+        center: const Offset(18, 37),
+        width: 28,
+        height: 14,
       ),
       0,
       math.pi,
@@ -510,6 +531,7 @@ class _SoundBars extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
+        final ink = Theme.of(context).colorScheme.onSurface;
         return Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -527,7 +549,7 @@ class _SoundBars extends StatelessWidget {
               height: h,
               margin: EdgeInsets.only(right: i == 4 ? 0 : 3),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: ink,
                 borderRadius: BorderRadius.circular(1.5),
               ),
             );
@@ -549,8 +571,9 @@ class _HeaderChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: const Color(0xFF1C1C1E),
+      color: AppColors.chip(isDark),
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -560,6 +583,81 @@ class _HeaderChip extends StatelessWidget {
           width: 48,
           height: 48,
           child: Center(child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header ki lambi chip — Enter arrow (upar) + three dots, ek hi pill me.
+/// Dono icons ek hi background par hain — beech me sirf gap hai,
+/// koi partition/divider line nahi. Height back chip jitni (48).
+class _HeaderPill extends StatelessWidget {
+  final VoidCallback onEnterTap;
+  final VoidCallback onMoreTap;
+  final Color ink;
+
+  const _HeaderPill({
+    required this.onEnterTap,
+    required this.onMoreTap,
+    required this.ink,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: AppColors.chip(isDark),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Enter — back wala arrow, vertically khada (upar ki taraf),
+            // thoda chhota (scale 0.85).
+            InkWell(
+              onTap: onEnterTap,
+              customBorder: const CircleBorder(),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: Transform.scale(
+                    scale: 0.85,
+                    child: Transform.rotate(
+                      angle: math.pi / 2,
+                      child: CustomPaint(
+                        size: const Size(30, 24),
+                        painter: _BackArrowPainter(ink),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Icons ke darmiyan sirf gap — koi line nahi.
+            const SizedBox(width: 20),
+            // Three dots (horizontal) — thoda bada (26).
+            InkWell(
+              onTap: onMoreTap,
+              customBorder: const CircleBorder(),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: Icon(
+                    Icons.more_horiz,
+                    size: 26,
+                    color: ink,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -618,8 +716,10 @@ class _ComposerActionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = AppColors.ink(isDark);
     return Material(
-      color: const Color(0xFF1C1C1E),
+      color: AppColors.chip(isDark),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -637,7 +737,7 @@ class _ComposerActionsSheet extends StatelessWidget {
                   width: 38,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
+                    color: ink.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -645,7 +745,7 @@ class _ComposerActionsSheet extends StatelessWidget {
               const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceGray,
+                  color: AppColors.raised(isDark),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: ClipRRect(
@@ -660,19 +760,19 @@ class _ComposerActionsSheet extends StatelessWidget {
                         enabled: hasText,
                         onTap: onClear,
                       ),
-                      _sheetDivider(),
+                      _sheetDivider(ink),
                       _SheetActionRow(
                         icon: Icons.content_copy_outlined,
                         label: 'Copy',
-                        color: Colors.white,
+                        color: ink,
                         enabled: hasText,
                         onTap: onCopy,
                       ),
-                      _sheetDivider(),
+                      _sheetDivider(ink),
                       _SheetActionRow(
                         icon: Icons.replay_outlined,
                         label: 'Re-type',
-                        color: Colors.white,
+                        color: ink,
                         enabled: hasText,
                         onTap: onReType,
                       ),
@@ -687,10 +787,10 @@ class _ComposerActionsSheet extends StatelessWidget {
     );
   }
 
-  Widget _sheetDivider() => Container(
+  Widget _sheetDivider(Color ink) => Container(
         height: 1,
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        color: Colors.white.withValues(alpha: 0.08),
+        color: ink.withValues(alpha: 0.08),
       );
 }
 

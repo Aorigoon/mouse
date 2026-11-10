@@ -5,13 +5,28 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const live = Color(0xFF22C55E);
 
-  /// App accent — white (Zain: lime ki jagah white). Floating nav ki
-  /// active pill aur highlights ke liye.
+  /// App accent — white (Zain: royal blue dekh kar wapas white kiya,
+  /// white zyada achha hai). Floating nav ki active pill aur
+  /// highlights ke liye.
   static const accent = Color(0xFFFFFFFF);
 
   /// Kaale touchpad par gray surfaces — chips aur bottom nav ke liye.
   /// Flat matte dark gray, koi border line ya gloss nahi.
   static const surfaceGray = Color(0xFF262628);
+
+  /// Brightness-conditional surfaces — dark me bilkul wahi approved
+  /// colors, light me matching raised equivalents.
+  /// `isDark` = Theme.of(context).brightness == Brightness.dark.
+  static Color raised(bool isDark) =>
+      isDark ? surfaceGray : const Color(0xFFEDEDED);
+
+  /// Dark chip (#1C1C1E) / light chip (#F5F5F5) — composer chips,
+  /// voice oval, bottom sheets.
+  static Color chip(bool isDark) =>
+      isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF5F5F5);
+
+  /// Ink — dark par white, light par black.
+  static Color ink(bool isDark) => isDark ? Colors.white : Colors.black;
 
   /// Royal blue — speed controls (dial, sliders) ke liye.
   static const royalBlue = Color(0xFF4169E1);

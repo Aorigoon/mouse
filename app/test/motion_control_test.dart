@@ -57,24 +57,38 @@ void main() {
     final controller = MotionController(conn: conn, settings: settings);
     controller.start();
 
-    // Pehle 10 readings: phone seedha — neutral calibration, koi move nahi.
-    for (var i = 0; i < 10; i++) {
+    // Pehle 15 readings: phone seedha — neutral calibration, koi move nahi.
+    for (var i = 0; i < 15; i++) {
       await emit(0.0, 0.0);
     }
     expect(conn.moves, isEmpty);
 
-    // Halka tilt (dead zone 0.5 ke andar) — kuch nahi hona chahiye.
+    // Halka tilt (dead zone 0.8 ke andar) — kuch nahi hona chahiye.
     await emit(0.2, 0.0);
     expect(conn.moves, isEmpty);
 
-    // Right tilt (x +2.0) — cursor left jana chahiye (dx negative).
-    await emit(2.0, 0.0);
+    // Right tilt (x +2.0) — filter ko settle hone do (5 readings),
+    // phir cursor left jana chahiye (dx negative), aur slow hona
+    // chahiye (purana 30px/event nahi — ab max ~14px/event).
+    for (var i = 0; i < 5; i++) {
+      await emit(2.0, 0.0);
+    }
     expect(conn.moves, isNotEmpty);
     expect(conn.moves.last.$1, lessThan(0));
+    expect(conn.moves.last.$1.abs(), lessThanOrEqualTo(15.0));
 
     // Forward tilt (y +2.0) — cursor neeche jana chahiye (dy positive).
-    await emit(0.0, 2.0);
+    for (var i = 0; i < 5; i++) {
+      await emit(0.0, 2.0);
+    }
     expect(conn.moves.last.$2, greaterThan(0));
+
+    // Strong tilt (x +5.0) — bhi capped hona chahiye, corner par
+    // nahi bhaagna chahiye (per-event max 15px).
+    for (var i = 0; i < 8; i++) {
+      await emit(5.0, 0.0);
+    }
+    expect(conn.moves.last.$1.abs(), lessThanOrEqualTo(15.0));
 
     // Stop — uske baad tilt par kuch nahi hona chahiye.
     final count = conn.moves.length;
