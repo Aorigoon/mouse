@@ -60,7 +60,11 @@ class _AuthPageState extends State<AuthPage> {
   void _openLegal(String title, String body) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LegalPage(title: title, body: body),
+        builder: (_) => LegalPage(
+          title: title,
+          body: body,
+          effectiveDate: legalEffectiveDate,
+        ),
       ),
     );
   }

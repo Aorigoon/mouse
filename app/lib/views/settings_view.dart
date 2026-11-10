@@ -1,47 +1,40 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../auth/auth_service.dart';
 import '../connection/discovery.dart';
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../theme.dart';
 import '../widgets/connect_sheet.dart';
 import '../widgets/mouse_controls_sheet.dart';
-import 'auth_page.dart';
-import 'profile_page.dart';
+import 'legal_page.dart';
 
 /// Settings — Muse app ke Settings screenshot jaisa.
 ///
-/// • Har row: bare outline icon + title (+ subtitle) + chevron.
-/// • Koi inline input nahi — na stepper, na slider, na switch, na
-///   text field, na segmented control. Har setting par tap karo to
-///   uski khubsurat bottom sheet khulti hai, input wahin hota hai.
+/// • Bada left title ("Settings"), koi back button nahi (tab hai).
+/// • Har row: bare outline icon + title + chevron — koi subtitle
+///   nahi (values bahar nahi dikhti — na 1.4, na 350 ms, na On/Off),
+///   is liye rows chhoti aur jagah kam.
+/// • Koi inline input nahi — har setting par tap karo to uski
+///   khubsurat bottom sheet khulti hai, input wahin hota hai.
+/// • Cards dark mode me gray hain (#262628, flat matte) — kaale nahi.
+/// • Profile card nahi hai (Zain: uski zaroorat nahi).
+/// • Three-dot wali mouse sheet ki settings yahan bhi hain —
+///   Scroll speed, Natural scrolling, Motion Control (+ Motion
+///   speed) — dono jagah ek hi AppSettings par chalte hain.
+/// • Neeche ek hi card me About, FAQ, Contact, Privacy Policy
+///   aur Terms of Service (screenshot wale card jaisa).
 /// • Free plan / Upgrade card nahi hai — Mousify ki koi subscription
 ///   nahi hai, is liye wo card copy nahi kiya.
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
 
-  void _openProfile(BuildContext context) {
-    final auth = context.read<AuthService>();
-    HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            auth.isSignedIn ? const ProfilePage() : const AuthPage(),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<AppSettings>();
-    final conn = context.watch<MousifyConnection>();
-    final auth = context.watch<AuthService>();
     final scheme = Theme.of(context).colorScheme;
-    final user = auth.currentUser;
-    final connected = conn.state == ConnState.connected;
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -51,94 +44,18 @@ class SettingsView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Title — screenshot jaisa center me (tab hai, is liye
-              // back button nahi).
+              // Bada left title — screenshot jaisa.
               const Padding(
                 padding: EdgeInsets.fromLTRB(4, 8, 4, 20),
                 child: Text(
                   'Settings',
-                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ),
-
-              // ================= PROFILE =================
-              _GroupCard(
-                radius: 28,
-                child: InkWell(
-                  onTap: () => _openProfile(context),
-                  borderRadius: BorderRadius.circular(28),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: user != null
-                                ? scheme.primary
-                                : scheme.surface,
-                            border: user == null
-                                ? Border.all(color: scheme.outline, width: 1.4)
-                                : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: user != null
-                              ? Text(
-                                  user.initials,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: scheme.onPrimary,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 28,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user?.name ?? 'Guest',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user?.email ?? 'Tap to sign in to Mousify',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 26,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
 
               // ================= CONNECTION =================
               _GroupCard(
@@ -147,18 +64,12 @@ class SettingsView extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.wifi_outlined,
                       title: 'Connection',
-                      subtitle: connected
-                          ? 'Connected to ${conn.hostName ?? 'PC'}'
-                          : conn.state == ConnState.connecting
-                              ? 'Connecting…'
-                              : 'Offline',
                       onTap: () => showConnectSheet(context),
                     ),
                     const _RowDivider(),
                     _SettingsRow(
                       icon: Icons.radar_outlined,
                       title: 'Nearby servers',
-                      subtitle: 'See PCs on your Wi-Fi',
                       onTap: () => _openServersSheet(context),
                     ),
                   ],
@@ -167,13 +78,13 @@ class SettingsView extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ================= MOUSE =================
+              // Three-dot wali mouse sheet ki settings yahan bhi hain.
               _GroupCard(
                 child: Column(
                   children: [
                     _SettingsRow(
                       icon: Icons.speed_outlined,
                       title: 'Pointer sensitivity',
-                      subtitle: settings.sensitivity.toStringAsFixed(1),
                       onTap: () => _openSliderSheet(
                         context,
                         title: 'Pointer sensitivity',
@@ -187,7 +98,6 @@ class SettingsView extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.swap_vert_outlined,
                       title: 'Scroll speed',
-                      subtitle: settings.scrollSpeed.toStringAsFixed(1),
                       onTap: () => _openSliderSheet(
                         context,
                         title: 'Scroll speed',
@@ -201,7 +111,6 @@ class SettingsView extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.mouse_outlined,
                       title: 'Wheel sensitivity',
-                      subtitle: settings.wheelSensitivity.toStringAsFixed(1),
                       onTap: () => _openSliderSheet(
                         context,
                         title: 'Wheel sensitivity',
@@ -215,7 +124,6 @@ class SettingsView extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.bolt_outlined,
                       title: 'Double-tap speed',
-                      subtitle: '${settings.doubleTapSpeed.round()} ms',
                       onTap: () => _openSliderSheet(
                         context,
                         title: 'Double-tap speed',
@@ -230,9 +138,13 @@ class SettingsView extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.swap_vertical_circle_outlined,
                       title: 'Natural scrolling',
-                      subtitle:
-                          settings.naturalScroll ? 'On' : 'Off',
                       onTap: () => _openNaturalScrollSheet(context),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.screen_rotation_rounded,
+                      title: 'Motion Control',
+                      onTap: () => _openMotionSheet(context),
                     ),
                   ],
                 ),
@@ -244,19 +156,69 @@ class SettingsView extends StatelessWidget {
                 child: _SettingsRow(
                   icon: Icons.dark_mode_outlined,
                   title: 'Appearance',
-                  subtitle: settings.isDark ? 'Dark' : 'Light',
                   onTap: () => _openAppearanceSheet(context),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // ================= ABOUT =================
+              // ================= ABOUT & LEGAL =================
+              // Ek hi card me: About, FAQ, Contact, Privacy Policy,
+              // Terms of Service (screenshot wale card jaisa).
               _GroupCard(
-                child: _SettingsRow(
-                  icon: Icons.info_outline_rounded,
-                  title: 'About Mousify',
-                  subtitle: 'Version 1.0.0',
-                  onTap: () => _openAboutSheet(context),
+                child: Column(
+                  children: [
+                    _LegalRow(
+                      title: 'About',
+                      onTap: () => _openLegalPage(
+                        context,
+                        title: 'About Mousify',
+                        body: aboutText,
+                      ),
+                    ),
+                    const _LegalDivider(),
+                    _LegalRow(
+                      title: 'FAQ',
+                      onTap: () => _openLegalPage(
+                        context,
+                        title: 'FAQ',
+                        body: faqText,
+                      ),
+                    ),
+                    const _LegalDivider(),
+                    _LegalRow(
+                      title: 'Contact',
+                      trailing: Text(
+                        _contactEmail,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                      ),
+                      onTap: () => _copyContactEmail(context),
+                    ),
+                    const _LegalDivider(),
+                    _LegalRow(
+                      title: 'Privacy Policy',
+                      onTap: () => _openLegalPage(
+                        context,
+                        title: 'Privacy Policy',
+                        body: legalPrivacyText,
+                        effectiveDate: legalEffectiveDate,
+                      ),
+                    ),
+                    const _LegalDivider(),
+                    _LegalRow(
+                      title: 'Terms of Service',
+                      onTap: () => _openLegalPage(
+                        context,
+                        title: 'Terms of Service',
+                        body: legalTermsText,
+                        effectiveDate: legalEffectiveDate,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -268,20 +230,19 @@ class SettingsView extends StatelessWidget {
   }
 }
 
-/// Bada gol card — inspiration wale settings jaisa, flat matte.
+/// Bada gol card — dark mode me gray (#262628), flat matte.
 class _GroupCard extends StatelessWidget {
   final Widget child;
-  final double radius;
 
-  const _GroupCard({required this.child, this.radius = 24});
+  const _GroupCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: scheme.surfaceContainerHighest,
+      color: AppColors.raised(isDark),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: BorderRadius.circular(24),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -303,19 +264,16 @@ class _RowDivider extends StatelessWidget {
   }
 }
 
-/// Screenshot jaisi row: bare outline icon + title (+ subtitle) +
-/// side me chevron. Koi tile, koi inline control nahi — tap par
-/// uski bottom sheet khulti hai.
+/// Screenshot jaisi row: bare outline icon + title + side me
+/// chevron. Koi subtitle nahi — values bahar nahi dikhti.
 class _SettingsRow extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String? subtitle;
   final VoidCallback? onTap;
 
   const _SettingsRow({
     required this.icon,
     required this.title,
-    this.subtitle,
     this.onTap,
   });
 
@@ -338,27 +296,12 @@ class _SettingsRow extends StatelessWidget {
               Icon(icon, size: 24, color: scheme.onSurface),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               if (onTap != null)
@@ -373,6 +316,109 @@ class _SettingsRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Legal card ki row — screenshot wale card jaisi: sirf title +
+/// side me open-in-new icon (ya Contact ke liye email). Koi left
+/// icon nahi.
+class _LegalRow extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+  final VoidCallback onTap;
+
+  const _LegalRow({
+    required this.title,
+    this.trailing,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              trailing ??
+                  Icon(
+                    Icons.open_in_new_rounded,
+                    size: 22,
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Legal card ke rows ke beech wali divider — title se shuru.
+class _LegalDivider extends StatelessWidget {
+  const _LegalDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 18,
+      color: Theme.of(context).colorScheme.outline,
+    );
+  }
+}
+
+const String _contactEmail = 'contact@aorigoon.com';
+
+/// Legal/FAQ/About page kholo — screenshot wali Terms page jaisa.
+void _openLegalPage(
+  BuildContext context, {
+  required String title,
+  required String body,
+  String? effectiveDate,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => LegalPage(
+        title: title,
+        body: body,
+        effectiveDate: effectiveDate,
+      ),
+    ),
+  );
+}
+
+/// Contact email copy karo + batado.
+void _copyContactEmail(BuildContext context) {
+  HapticFeedback.selectionClick();
+  // Clipboard ka wait nahi karte — copy fire-and-forget hai, snackbar
+  // turant dikhao. (Test env me Clipboard.setData ka Future kabhi
+  // complete nahi hota, is liye await karna hang karta hai.)
+  unawaited(
+    Clipboard.setData(const ClipboardData(text: _contactEmail))
+        .catchError((_) {}),
+  );
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Email copied: contact@aorigoon.com'),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
 }
 
 // ================= BOTTOM SHEETS =================
@@ -569,6 +615,91 @@ class _NaturalScrollSheetContent extends StatelessWidget {
   }
 }
 
+/// Motion Control ki sheet — switch + on ho to Motion speed slider.
+void _openMotionSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'Motion Control',
+    child: const _MotionSheetContent(),
+  );
+}
+
+class _MotionSheetContent extends StatelessWidget {
+  const _MotionSheetContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Motion Control',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Phone tilt karke cursor chalao',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: settings.motionControl,
+              onChanged: settings.setMotionControl,
+            ),
+          ],
+        ),
+        if (settings.motionControl) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Motion speed',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+              ),
+              Text(
+                settings.motionSensitivity.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SpeedSlider(
+            min: 0.5,
+            max: 2.0,
+            value: settings.motionSensitivity,
+            onChanged: settings.setMotionSensitivity,
+            sliderKey: const Key('settings-motion-speed-slider'),
+            tooltipKey: const Key('settings-motion-speed-tooltip'),
+            trackKey: const Key('settings-motion-speed-slider-track'),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
 /// Appearance ki sheet — Dark / Light options, check ke saath.
 void _openAppearanceSheet(BuildContext context) {
   _openSheet(
@@ -655,51 +786,6 @@ class _OptionRow extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// About ki sheet.
-void _openAboutSheet(BuildContext context) {
-  _openSheet(
-    context,
-    title: 'About Mousify',
-    child: const _AboutSheetContent(),
-  );
-}
-
-class _AboutSheetContent extends StatelessWidget {
-  const _AboutSheetContent();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          'Mousify',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Version 1.0.0',
-          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Made by Aorigoon',
-          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Your phone is the mouse now — turn it into a trackpad '
-          'and keyboard for your PC.',
-          style: TextStyle(fontSize: 14, color: scheme.onSurface, height: 1.5),
-        ),
-        const SizedBox(height: 8),
-      ],
     );
   }
 }

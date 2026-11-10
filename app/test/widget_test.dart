@@ -63,7 +63,17 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_horiz_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Motion speed'), findsNothing);
-    await tester.tap(find.byType(Switch));
+    // Sheet me do switches hain (Natural scrolling + Motion Control) —
+    // Motion Control wala hi tap karo (uski row ke andar wala Switch).
+    final motionSwitch = find.descendant(
+      of: find.ancestor(
+        of: find.text('Motion Control'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(Switch),
+    );
+    expect(motionSwitch, findsOneWidget);
+    await tester.tap(motionSwitch);
     await tester.pumpAndSettle();
     expect(find.text('Motion speed'), findsOneWidget);
   });

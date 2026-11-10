@@ -48,6 +48,9 @@ class FloatingNavBar extends StatelessWidget {
       label: 'Settings',
       icon: Icons.settings_suggest_rounded,
       activeIcon: Icons.settings_suggest_rounded,
+      // Gear glyph box ke andar chhota banta hai — baaki icons se
+      // chhota lagta tha, is liye iska size thoda bada hai.
+      iconSize: 26,
     ),
   ];
 
@@ -98,6 +101,8 @@ class _NavItem {
   final String label;
   final IconData? icon;
   final IconData? activeIcon;
+  // Material icon ka size (default 22). Glyph chhota bane to bada do.
+  final double iconSize;
   // Custom icon ho to ye use hota hai (color = us waqt ka icon color).
   final Widget Function(Color color)? customIcon;
 
@@ -105,6 +110,7 @@ class _NavItem {
     required this.label,
     this.icon,
     this.activeIcon,
+    this.iconSize = 22,
     this.customIcon,
   });
 }
@@ -180,7 +186,7 @@ class _NavButtonState extends State<_NavButton> {
                         )
                       : Icon(
                           selected ? widget.item.activeIcon : widget.item.icon,
-                          size: 22,
+                          size: widget.item.iconSize,
                           // Inactive icons halke ink
                           color: selected
                               ? Colors.black

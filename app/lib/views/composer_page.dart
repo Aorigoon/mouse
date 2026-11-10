@@ -9,6 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../connection/live_typing.dart';
 import '../connection/server_connection.dart';
 import '../theme.dart';
+import '../widgets/back_chip.dart';
 
 /// Composer — ek seedha notepad page: jo likho/dictate karo wo real-time
 /// PC ke focused window me type hota hai (add + delete dono). Bas.
@@ -290,16 +291,12 @@ class _ComposerPageState extends State<ComposerPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Back button — left side wali chip.
-                      _HeaderChip(
+                      // Back button — left side wali chip (shared BackChip).
+                      BackChip(
                         onTap: () {
                           HapticFeedback.selectionClick();
                           Navigator.of(context).pop();
                         },
-                        child: CustomPaint(
-                          size: const Size(30, 24),
-                          painter: _BackArrowPainter(ink),
-                        ),
                       ),
                       // Right side: ek hi lambi chip — Enter + three dots,
                       // beech me gap, koi partition line nahi.
@@ -560,35 +557,6 @@ class _SoundBars extends StatelessWidget {
   }
 }
 
-/// Header ka button — poora gol (circle, 48×48), dark (#1C1C1E,
-/// voice chip jaisa), safed content. Back button (left) aur
-/// horizontal three dots (right) dono isi gol button me hain.
-class _HeaderChip extends StatelessWidget {
-  final VoidCallback onTap;
-  final Widget child;
-
-  const _HeaderChip({required this.onTap, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: AppColors.chip(isDark),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(child: child),
-        ),
-      ),
-    );
-  }
-}
-
 /// Header ki lambi chip — Enter arrow (upar) + three dots, ek hi pill me.
 /// Dono icons ek hi background par hain — beech me sirf gap hai,
 /// koi partition/divider line nahi. Height back chip jitni (48).
@@ -632,7 +600,7 @@ class _HeaderPill extends StatelessWidget {
                       angle: math.pi / 2,
                       child: CustomPaint(
                         size: const Size(30, 24),
-                        painter: _BackArrowPainter(ink),
+                        painter: BackArrowPainter(ink),
                       ),
                     ),
                   ),
@@ -662,41 +630,6 @@ class _HeaderPill extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Arrow paint karta hai — "(" curve (tip) + piche choti horizontal line.
-class _BackArrowPainter extends CustomPainter {
-  final Color color;
-
-  _BackArrowPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    // Arrow ko thoda aage (left) karo — pehle glyph circle ke center se
-    // ~3.5px right (peeche) tha; 5px left shift se front aage aa jata hai.
-    canvas.translate(-5, 0);
-    // "(" curve — arrow ka tip, pehle jitna hi rounded aur utna hi size.
-    // (Fixed coordinates taaki canvas chauda karne se curve na badhe.)
-    final head = Path()
-      ..moveTo(16.9, 2)
-      ..quadraticBezierTo(1.04, size.height / 2, 16.9, size.height - 2);
-    canvas.drawPath(head, paint);
-    // Piche choti si line — arrow ki shaft, tip se right ki taraf.
-    // Tip curve ka leftmost point hai (~8.97).
-    canvas.drawLine(
-      Offset(8.97, size.height / 2),
-      Offset(size.width - 2, size.height / 2),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BackArrowPainter old) => old.color != color;
 }
 
 /// Clear / Copy / Re-type wali bottom sheet — Settings sheet jaisi dark,

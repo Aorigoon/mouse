@@ -11,10 +11,12 @@ import '../theme.dart';
 /// dark gray rounded card, rows with icon + label + chevron/switch.
 /// - Mouse Speed: card ke andar hi snail–slider–rabbit (gradient
 ///   track, drag par value bubble) — koi alag page/sheet nahi.
+/// - Scroll speed bhi yahin hai (Settings se yahan le aaye), usi
+///   gradient slider ke saath.
+/// - Natural scrolling bhi yahin toggle hota hai.
 /// - Motion Control yahin toggle hota hai; on ho to neeche uski
 ///   speed ka slider bhi aa jata hai.
-/// Settings page wala sara ka sara edit yahan nahi; scroll/wheel/
-/// double-tap wagera Settings tab me rehte hain.
+/// Wheel / double-tap Settings tab me rehte hain.
 Future<void> showMouseControlsSheet(BuildContext context) {
   HapticFeedback.selectionClick();
   return showModalBottomSheet<void>(
@@ -150,6 +152,71 @@ class _MouseSettingsSheet extends StatelessWidget {
                           sliderKey: const Key('speed-slider'),
                           tooltipKey: const Key('speed-tooltip'),
                           trackKey: const Key('speed-slider-track'),
+                        ),
+                      ),
+                      _RowDivider(),
+                      // Scroll speed — Mouse Speed jaisa hi section.
+                      Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.swap_vert_rounded,
+                                size: 22,
+                                color: ink.withValues(alpha: 0.85)),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                'Scroll speed',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: ink,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              settings.scrollSpeed.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: ink.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: SpeedSlider(
+                          min: 0.5,
+                          max: 3.0,
+                          value: settings.scrollSpeed,
+                          onChanged: settings.setScrollSpeed,
+                          sliderKey: const Key('scroll-speed-slider'),
+                          tooltipKey: const Key('scroll-speed-tooltip'),
+                          trackKey: const Key('scroll-speed-slider-track'),
+                        ),
+                      ),
+                      _RowDivider(),
+                      _SettingsRow(
+                        icon: Icons.swap_vertical_circle_outlined,
+                        label: 'Natural scrolling',
+                        trailing: Switch(
+                          value: settings.naturalScroll,
+                          // Motion Control wali hi switch styling.
+                          activeThumbColor:
+                              isDark ? Colors.black : Colors.white,
+                          activeTrackColor: isDark
+                              ? AppColors.accent
+                              : Colors.black,
+                          inactiveThumbColor:
+                              isDark ? Colors.white : Colors.black,
+                          inactiveTrackColor:
+                              ink.withValues(alpha: 0.2),
+                          onChanged: (v) {
+                            settings.setNaturalScroll(v);
+                            HapticFeedback.selectionClick();
+                          },
                         ),
                       ),
                       _RowDivider(),
