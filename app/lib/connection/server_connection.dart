@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-enum ConnState { disconnected, connecting, waitingPair, connected }
+enum ConnState { disconnected, connecting, connected }
 
 /// Jab tak connection ban na jaye (ya timeout ho) wait karta hai.
 /// QR scan / manual connect ke baad feedback ke liye.
@@ -42,16 +42,12 @@ class MousifyConnection extends ChangeNotifier {
   String? osName; // PC ka OS — server batata hai (Windows/Fedora/Ubuntu)
   String? lastError;
 
-  /// Pairing complete hone par naya token wapas settings ko milta hai.
-  void Function(String token)? onTokenPaired;
-
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   Timer? _reconnectTimer;
   Timer? _pingTimer;
   bool _wantConnected = false;
   String? _token;
-  String? _pairCode;
 
   final StreamController<Map<String, dynamic>> _events =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -59,11 +55,10 @@ class MousifyConnection extends ChangeNotifier {
   /// Server ke non-connection events (apps, etc.) — pages listen kar sakti hain.
   Stream<Map<String, dynamic>> get events => _events.stream;
 
-  void connect(String newHost, int newPort, {String? token, String? pairCode}) {
+  void connect(String newHost, int newPort, {String? token}) {
     host = newHost;
     port = newPort;
     _token = token;
-    _pairCode = pairCode;
     _wantConnected = true;
     lastError = null;
     _reconnectTimer?.cancel();
@@ -74,9 +69,7 @@ class MousifyConnection extends ChangeNotifier {
     await _sub?.cancel();
     await _channel?.sink.close();
     _channel = null;
-    _setState(_token == null && _pairCode != null
-        ? ConnState.waitingPair
-        : ConnState.connecting);
+    _setState(ConnState.connecting);
     try {
       final uri = Uri.parse('ws://$host:$port');
       final channel = IOWebSocketChannel.connect(
@@ -88,7 +81,6 @@ class MousifyConnection extends ChangeNotifier {
 
       final hello = <String, dynamic>{'t': 'hello', 'name': 'mousify-app'};
       if (_token != null) hello['token'] = _token;
-      if (_pairCode != null) hello['pair_code'] = _pairCode;
       channel.sink.add(jsonEncode(hello));
 
       _sub = channel.stream.listen(
@@ -120,19 +112,13 @@ class MousifyConnection extends ChangeNotifier {
         _setState(ConnState.connected);
         _startPing();
         break;
-      case 'paired':
-        _token = msg['token'] as String?;
-        _pairCode = null;
-        hostName = msg['host'] as String?;
-        osName = msg['os'] as String?;
-        if (_token != null) onTokenPaired?.call(_token!);
-        _setState(ConnState.connected);
-        _startPing();
-        break;
       case 'pair-required':
-        lastError = 'Pairing required — enter the 6-digit code in Settings';
+        // Pair-with-code hata diya — server code maange to QR scan
+        // karo (Connect sheet ya Settings). waitingPair state nahi
+        // rahi, is liye seedha disconnected + error.
+        lastError = 'Pairing required — scan the QR code from the Connect sheet';
         _wantConnected = false;
-        _setState(ConnState.waitingPair);
+        _setState(ConnState.disconnected);
         break;
       case 'error':
         if (kDebugMode) debugPrint('server error: ${msg['msg']}');

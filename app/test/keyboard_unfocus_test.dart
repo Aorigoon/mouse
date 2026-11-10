@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mousify/main.dart';
+import 'package:mousify/widgets/apps_grid_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'test_helpers.dart';
 
-/// Tab badalne par keyboard band ho — Settings ke IP field par focus
+/// Tab badalne par keyboard band ho — Apps ke search field par focus
 /// ho, phir Mouse tab par jao to primaryFocus null hona chahiye.
-/// (Settings page _KeepAlive se zinda rehta hai, is liye focus
-/// khud nahi chhoot-ta — HomeShell tab change par unfocus karta hai.)
+/// (Settings ke IP field par ye test pehle tha — wo field ab Connect
+/// sheet ke andar hai, is liye search field se verify hota hai.
+/// HomeShell tab change par unfocus karta hai.)
 void main() {
   setUpAll(loadTestFonts);
 
@@ -26,13 +28,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 400));
 
-    // Settings tab par jao.
-    await tester.tap(find.byIcon(Icons.settings_suggest_rounded));
+    // Apps tab par jao.
+    await tester.tap(find.byType(AppsGridIcon));
     await tester.pumpAndSettle();
-    expect(find.text('MANUAL IP & PORT'), findsOneWidget);
+    expect(find.text('Search apps'), findsOneWidget);
 
-    // IP field par tap — focus milna chahiye, keyboard khulna chahiye.
-    await tester.tap(find.byType(TextField).first);
+    // Search field par tap — focus milna chahiye, keyboard khulna chahiye.
+    await tester.tap(find.byType(TextField));
     await tester.pump();
     final focusedNode = FocusManager.instance.primaryFocus;
     expect(focusedNode, isNotNull);

@@ -198,11 +198,16 @@ class _DockPageState extends State<DockPage> {
               ),
             ],
           ),
-          // Floating search bar — floating nav se upar
-          Positioned(
+          // Floating search bar — keyboard band ho to floating nav
+          // ke upar (bottom 112); keyboard khule to nav chhup jata
+          // hai, is liye bar seedha keyboard ke upar aa jata hai
+          // (bottom 16 — wahan jahan pehle nav hota tha).
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOutCubic,
             left: 16,
             right: 16,
-            bottom: 112, // Floating nav ke upar
+            bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 112,
             child: _BeautifulSearchBar(
               controller: _queryController,
               focusNode: _focusNode,
@@ -503,9 +508,10 @@ class _Message extends StatelessWidget {
 /// navigation ke upar, khubsurat tareeke se.
 ///
 /// - Centered pill (unfocused) — tap par smoothly full width ho jata hai.
-/// - Focus par halka sa upar uthta hai aur shadow gehra hota hai;
-///   keyboard khule to Scaffold resize ki wajah se bar keyboard ke
-///   upar overlay rehta hai (neeche nahi dhasakta).
+/// - Focus par halka sa upar uthta hai aur shadow gehra hota hai.
+/// - Keyboard khule to bottom nav chhup jata hai (HomeShell) aur bar
+///   seedha keyboard ke upar aa jata hai (bottom 16) — nav beech me
+///   nahi aata, bar keyboard se door nahi rehta.
 /// - Hint "Search apps" — proper hint color (pehle red tha, wo bug tha).
 class _BeautifulSearchBar extends StatefulWidget {
   final TextEditingController controller;

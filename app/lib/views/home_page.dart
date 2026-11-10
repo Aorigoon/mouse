@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
-import '../connection/settings_store.dart';
 import '../theme.dart';
+import '../widgets/connect_sheet.dart';
 import '../widgets/mouse_controls_sheet.dart';
 import '../widgets/touchpad_area.dart';
 
@@ -24,7 +24,6 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final conn = context.watch<MousifyConnection>();
-    final settings = context.read<AppSettings>();
     final connected = conn.state == ConnState.connected;
     final scheme = Theme.of(context).colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
@@ -70,9 +69,11 @@ class HomePage extends StatelessWidget {
             right: 18,
             child: _TopPill(
               connected: connected,
-              onOsTap: connected
-                  ? null
-                  : () => _reconnect(context, settings),
+              // Wifi par tap — Connect sheet khulti hai (IP/port +
+              // Connect/Disconnect), chahe connected ho ya offline.
+              // Pehle offline par seedha reconnect hota tha (bina
+              // bataye), ab setting sheet me khulti hai.
+              onWifiTap: () => showConnectSheet(context),
               onMoreTap: () => showMouseControlsSheet(context),
             ),
           ),
@@ -81,31 +82,21 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  void _reconnect(BuildContext context, AppSettings settings) {
-    final conn = context.read<MousifyConnection>();
-    final host = settings.host;
-    if (host == null || host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Set your PC in Settings first')),
-      );
-      return;
-    }
-    HapticFeedback.selectionClick();
-    conn.connect(host, settings.port, token: settings.token);
-  }
 }
 
 /// Upar right corner — sirf icons wali pill: wifi icon + three-dot.
 /// Koi text nahi — na "Offline", na OS naam. Dono icons bare hain.
 /// Flat matte gray — koi border line, koi shadow nahi.
+/// Wifi par tap = Connect sheet (IP/port + Connect/Disconnect),
+/// dots par tap = Mouse Controls sheet.
 class _TopPill extends StatelessWidget {
   final bool connected;
-  final VoidCallback? onOsTap;
+  final VoidCallback onWifiTap;
   final VoidCallback onMoreTap;
 
   const _TopPill({
     required this.connected,
-    required this.onOsTap,
+    required this.onWifiTap,
     required this.onMoreTap,
   });
 
@@ -114,7 +105,7 @@ class _TopPill extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = AppColors.ink(isDark);
     final wifiIcon = GestureDetector(
-      onTap: onOsTap,
+      onTap: onWifiTap,
       behavior: HitTestBehavior.opaque,
       child: Icon(
         connected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
@@ -155,12 +146,16 @@ class _TopPill extends StatelessWidget {
 ///
 /// Upar header me LEFT side par (wifi/three-dot wali pill RIGHT side
 /// par hai — dono alag-alag taraf, merge nahi).
-/// Collapsed: sirf chip — SINGLE icon (touch/hand — gestures ka
-/// sab se saaf symbol; brackets "(" ")" code jaisi lagti thi, is
-/// liye hata di).
+/// Collapsed: sirf chip — SINGLE icon (touch/hand).
 /// Tap par right ki taraf expand hokar SQUARE-ish guide dikhata hai
 /// (2×2 grid: 2 upar, 2 neeche — horizontally lamba nahi).
 /// Dobara tap par wapas chip. Flat matte, koi border/shadow nahi.
+///
+/// Expanded card wifi/three-dot wali pill se TAKRATA nahi — chaudi
+/// sirf 200 (screen chhoti ho to us hisaab se aur kam), taaki pill
+/// se saaf gap rahe. Expand animation khubsurat hai: size halke
+/// easeOut se badhta hai, content fade + halka scale-in hota hai,
+/// aur dabao par chip halki si chhoti hoti hai (press feedback).
 class _GuideChip extends StatefulWidget {
   const _GuideChip();
 
@@ -170,6 +165,7 @@ class _GuideChip extends StatefulWidget {
 
 class _GuideChipState extends State<_GuideChip> {
   bool _expanded = false;
+  bool _pressed = false;
 
   void _toggle() {
     HapticFeedback.selectionClick();
@@ -180,38 +176,85 @@ class _GuideChipState extends State<_GuideChip> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = AppColors.ink(isDark);
+    // Expanded card ki chaudi — wifi/three-dot wali pill se saaf gap:
+    // left margin (18) + card + gap (16) + pill (~116) screen me
+    // aana chahiye. 390 wide screen par 200 banta hai; chhoti
+    // screen par us hisaab se kam (kam se kam 170).
+    final expandedWidth =
+        (MediaQuery.of(context).size.width - 150).clamp(170.0, 200.0);
     return GestureDetector(
       key: const Key('guide-chip'),
       onTap: _toggle,
-      // AnimatedSize — topLeft anchor: pill left edge se right ki
-      // taraf aur neeche ki taraf expand hoti hai. Child apni natural
-      // size par layout hota hai, animation me clip hota hai.
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOutCubic,
-        alignment: Alignment.topLeft,
-        child: Container(
-          width: _expanded ? 220 : 48,
-          height: _expanded ? 150 : 48,
-          padding: EdgeInsets.symmetric(
-            horizontal: _expanded ? 12 : 0,
-            vertical: _expanded ? 12 : 0,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_expanded ? 20 : 24),
-            color: AppColors.raised(isDark).withValues(alpha: 0.88),
-          ),
-          child: _expanded
-              ? _GuideExpanded(ink: ink)
-              : Center(
-                  child: Icon(
-                    Icons.touch_app_rounded,
-                    size: 28,
-                    color: ink,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      // Dabao par halka sa chhota — tactile press feedback.
+      child: AnimatedScale(
+        scale: _pressed ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        // AnimatedSize — topLeft anchor: pill left edge se right ki
+        // taraf aur neeche ki taraf expand hoti hai. Size halke
+        // easeOut se badhta hai (koi overshoot nahi, pill se nahi
+        // takrata). Content fade + halka scale-in ke saath aata hai.
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topLeft,
+          child: Container(
+            width: _expanded ? expandedWidth : 48,
+            height: _expanded ? 150 : 48,
+            padding: EdgeInsets.symmetric(
+              horizontal: _expanded ? 12 : 0,
+              vertical: _expanded ? 12 : 0,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(_expanded ? 20 : 24),
+              color: AppColors.raised(isDark).withValues(alpha: 0.88),
+            ),
+            child: _expanded
+                ? _GuideExpandedAnimated(ink: ink)
+                : Center(
+                    child: Icon(
+                      Icons.touch_app_rounded,
+                      size: 28,
+                      color: ink,
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Expanded guide ka enter animation — fade + halka scale-in.
+///
+/// TweenAnimationBuilder insert hote hi 0 se 1 tak animate karta
+/// hai, is liye content achanak nahi aata, khubsurat tareeke se
+/// khulta hai (opacity + 0.94 se 1.0 scale, 350ms easeOutCubic).
+class _GuideExpandedAnimated extends StatelessWidget {
+  final Color ink;
+
+  const _GuideExpandedAnimated({required this.ink});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) {
+        return Opacity(
+          opacity: t,
+          child: Transform.scale(
+            scale: 0.94 + 0.06 * t,
+            alignment: Alignment.topLeft,
+            child: child,
+          ),
+        );
+      },
+      child: _GuideExpanded(ink: ink),
     );
   }
 }

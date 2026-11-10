@@ -73,6 +73,20 @@ Future<void> loadTestFonts() async {
     ..addFont(load('test/fonts/Roboto-Regular.ttf'))
     ..addFont(load('test/fonts/Roboto-Medium.ttf'))
     ..addFont(load('test/fonts/Roboto-Bold.ttf'));
+  // Login page ka headline/tagline font (Plus Jakarta Sans) — warna
+  // Ahem fallback me text itna chauda hota hai ke button overflow kare.
+  final jakarta = FontLoader('PlusJakartaSans')
+    ..addFont(load('test/fonts/PlusJakartaSans-Regular.ttf'))
+    ..addFont(load('test/fonts/PlusJakartaSans-Medium.ttf'))
+    ..addFont(load('test/fonts/PlusJakartaSans-SemiBold.ttf'))
+    ..addFont(load('test/fonts/PlusJakartaSans-Bold.ttf'))
+    ..addFont(load('test/fonts/PlusJakartaSans-ExtraBold.ttf'));
+  // Login page ki headline ka display font (Sora).
+  final sora = FontLoader('Sora')
+    ..addFont(load('test/fonts/Sora-Regular.ttf'))
+    ..addFont(load('test/fonts/Sora-SemiBold.ttf'))
+    ..addFont(load('test/fonts/Sora-Bold.ttf'))
+    ..addFont(load('test/fonts/Sora-ExtraBold.ttf'));
   final icons = FontLoader('MaterialIcons')
     ..addFont(load('test/fonts/MaterialIcons-Regular.otf'));
   // Composer/terminal monospace fields — asli phone par system ka
@@ -81,5 +95,11 @@ Future<void> loadTestFonts() async {
   final mono = FontLoader('monospace')
     ..addFont(load('test/fonts/Roboto-Regular.ttf'))
     ..addFont(load('test/fonts/Roboto-Bold.ttf'));
-  await Future.wait([roboto.load(), icons.load(), mono.load()]);
+  await Future.wait([
+    roboto.load(),
+    jakarta.load(),
+    sora.load(),
+    icons.load(),
+    mono.load(),
+  ]);
 }

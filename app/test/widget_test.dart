@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mousify/main.dart';
+import 'package:mousify/widgets/apps_grid_icon.dart';
+import 'package:mousify/widgets/toolbox_icon.dart';
 import 'package:mousify/widgets/touchpad_area.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,8 +21,8 @@ void main() {
     expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
     expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
     expect(find.byIcon(Icons.touch_app_rounded), findsWidgets);
-    expect(find.byIcon(Icons.apps_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.handyman_rounded), findsOneWidget);
+    expect(find.byType(AppsGridIcon), findsOneWidget);
+    expect(find.byType(ToolboxIcon), findsOneWidget);
     expect(find.byIcon(Icons.settings_suggest_rounded), findsOneWidget);
   });
 

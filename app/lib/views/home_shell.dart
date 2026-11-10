@@ -89,7 +89,6 @@ class _HomeShellState extends State<HomeShell> {
   void _wireUp() {
     final settings = context.read<AppSettings>();
     final conn = context.read<MousifyConnection>();
-    conn.onTokenPaired = settings.setToken;
     // Motion Control — sheet ka toggle badle to turant on/off.
     _settings = settings;
     _motion = MotionController(conn: conn, settings: settings);
@@ -157,6 +156,13 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Keyboard khula ho (viewInsets.bottom > 0 — Apps search, Settings
+    // IP field, Composer) to bottom nav neeche slide hokar chhup jata
+    // hai. Warna Scaffold resize ki wajah se nav keyboard ke upar
+    // chadh jata hai aur beech me aa jata hai (Apps me search bar
+    // keyboard se door ho jati thi). Keyboard band hote hi nav wapas
+    // slide hokar aa jata hai.
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     // Android back: Apps/Settings/Composer se → Home; Home par → app exit
     return PopScope(
       canPop: _index == 0,
@@ -199,9 +205,24 @@ class _HomeShellState extends State<HomeShell> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: FloatingNavBar(
-                currentIndex: _index,
-                onTap: _goTo,
+              child: IgnorePointer(
+                ignoring: keyboardOpen,
+                child: AnimatedSlide(
+                  offset: keyboardOpen
+                      ? const Offset(0, 1.5)
+                      : Offset.zero,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: keyboardOpen ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOutCubic,
+                    child: FloatingNavBar(
+                      currentIndex: _index,
+                      onTap: _goTo,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

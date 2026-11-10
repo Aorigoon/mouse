@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mousify/main.dart';
 import 'package:mousify/views/composer_page.dart';
 import 'package:mousify/views/dock_page.dart';
+import 'package:mousify/widgets/apps_grid_icon.dart';
+import 'package:mousify/widgets/toolbox_icon.dart';
 import 'package:mousify/widgets/touchpad_area.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,8 +40,8 @@ void main() {
     // test me offline, koi server nahi
     expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
     expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.apps_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.handyman_rounded), findsOneWidget);
+    expect(find.byType(AppsGridIcon), findsOneWidget);
+    expect(find.byType(ToolboxIcon), findsOneWidget);
     expect(find.byIcon(Icons.settings_suggest_rounded), findsOneWidget);
 
     await expectLater(
@@ -136,6 +138,78 @@ void main() {
       find.byType(MousifyApp),
       matchesGoldenFile('goldens/mouse_settings_sheet.png'),
     );
+  });
+
+  testWidgets('real design screenshot - connect sheet', (tester) async {
+    // Wifi icon par tap — Connect sheet khulni chahiye (three-dot
+    // wali Settings sheet jaisi style): status + IP/port fields +
+    // bada Connect button. Fields me values type karke dikhate hain
+    // (saved host mock karne se app launch par auto-connect shuru
+    // ho jata hai aur uske timers test teardown fail kar dete hain).
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    // Phone size: 390x844 @ 2x
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byIcon(Icons.wifi_off_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connect to PC'), findsOneWidget);
+    expect(find.text('Not connected'), findsOneWidget);
+    // Scanner sab se pehle, header me koi X close nahi.
+    expect(find.text('Scan QR code'), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsNothing);
+    expect(find.text('PC IP address'), findsOneWidget);
+    expect(find.text('Port'), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, '192.168.1.10');
+    await tester.enterText(find.byType(TextField).last, '9898');
+    await tester.pump();
+
+    expect(find.text('192.168.1.10'), findsOneWidget);
+    expect(find.text('9898'), findsOneWidget);
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/connect_sheet.png'),
+    );
+  });
+
+  testWidgets('connect sheet - khaali IP par error, sheet khuli rehti hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byIcon(Icons.wifi_off_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Connect to PC'), findsOneWidget);
+
+    // IP khaali — Connect dabao to error snackbar, sheet band na ho.
+    await tester.tap(find.text('Connect'));
+    await tester.pump();
+    expect(
+      find.text('Enter a valid IP and port (e.g. 192.168.1.10 : 9898)'),
+      findsOneWidget,
+    );
+    expect(find.text('Connect to PC'), findsOneWidget);
   });
 
   testWidgets('real design screenshot - motion speed gradient slider',
@@ -309,7 +383,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Apps tab par jao.
-    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.tap(find.byType(AppsGridIcon));
     await tester.pumpAndSettle();
     expect(find.byType(DockPage), findsOneWidget);
 
@@ -339,7 +413,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Apps tab par jao, search bar par tap karo.
-    await tester.tap(find.byIcon(Icons.apps_rounded));
+    await tester.tap(find.byType(AppsGridIcon));
     await tester.pumpAndSettle();
     expect(find.byType(DockPage), findsOneWidget);
     await tester.tap(find.byType(TextField));
@@ -351,6 +425,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Search apps'), findsOneWidget);
+    // Keyboard khula ho to bottom nav chhupa hota hai (neeche slide
+    // hokar) — search bar seedha keyboard ke upar hota hai: bar ka
+    // neeche wala kinara keyboard ke top (844-300=544) se sirf ~16px
+    // upar hona chahiye. Pehle ye ~120px upar hota tha (nav beech
+    // me aa jata tha).
+    final barBottom = tester.getBottomLeft(find.byType(TextField)).dy;
+    expect(barBottom, greaterThan(500));
 
     await expectLater(
       find.byType(MousifyApp),

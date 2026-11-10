@@ -22,7 +22,6 @@ class StatusPill extends StatelessWidget {
     final (dotColor, dotBorder, text) = switch (state) {
       ConnState.connected => (AppColors.live, AppColors.live, label ?? 'Connected'),
       ConnState.connecting => (scheme.onSurfaceVariant, scheme.onSurfaceVariant, 'Connecting…'),
-      ConnState.waitingPair => (scheme.onSurfaceVariant, scheme.onSurfaceVariant, 'Pairing required'),
       ConnState.disconnected => (Colors.transparent, scheme.onSurfaceVariant, 'Offline'),
     };
     return Tooltip(

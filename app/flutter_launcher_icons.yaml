@@ -1,7 +1,16 @@
+# Launcher icon — YEHI file use hoti hai (pubspec wala block nahi,
+# kyunki ye file mile to tool pubspec ko ignore kar deta hai).
+# Source transparent hai (sirf safed haath), background color se aata hai:
+#   assets/icon/mousify_foreground.png = transparent hand (1024x1024)
+#   adaptive_icon_background = pure black #000000
+# Legacy (purane Android) ke liye flat PNG chahiye hota hai, is liye
+# mousify_legacy.png me haath + kaala background pehle se composite hai.
+# Generate karne ke liye: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/mousify_legacy.png"
+  background_color: "#000000"
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/icon/mousify_foreground.png"
   min_sdk_android: 21

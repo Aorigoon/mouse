@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
+import 'apps_grid_icon.dart';
+import 'toolbox_icon.dart';
 
 /// Floating rounded bottom navigation — Mousify ka naya premium nav.
 ///
@@ -24,7 +26,8 @@ class FloatingNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _items = [
+  // `final` hai, `const` nahi — Apps item ka customIcon ek closure hai.
+  static final _items = [
     _NavItem(
       label: 'Mouse',
       icon: Icons.touch_app_rounded,
@@ -32,13 +35,14 @@ class FloatingNavBar extends StatelessWidget {
     ),
     _NavItem(
       label: 'Apps',
-      icon: Icons.apps_rounded,
-      activeIcon: Icons.apps_rounded,
+      // Zain ki reference image wala 2x2 grid icon (3 squircle +
+      // upar-right diamond) — Material apps_rounded nahi.
+      customIcon: (color) => AppsGridIcon(color: color),
     ),
     _NavItem(
       label: 'Tools',
-      icon: Icons.handyman_rounded,
-      activeIcon: Icons.handyman_rounded,
+      // Zain ka diya hua Lucide toolbox SVG — Material handyman nahi.
+      customIcon: (color) => ToolboxIcon(color: color),
     ),
     _NavItem(
       label: 'Settings',
@@ -92,13 +96,16 @@ class FloatingNavBar extends StatelessWidget {
 
 class _NavItem {
   final String label;
-  final IconData icon;
-  final IconData activeIcon;
+  final IconData? icon;
+  final IconData? activeIcon;
+  // Custom icon ho to ye use hota hai (color = us waqt ka icon color).
+  final Widget Function(Color color)? customIcon;
 
   const _NavItem({
     required this.label,
-    required this.icon,
-    required this.activeIcon,
+    this.icon,
+    this.activeIcon,
+    this.customIcon,
   });
 }
 
@@ -162,18 +169,23 @@ class _NavButtonState extends State<_NavButton> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Icon halka sa bada ho jab active ho — subtle pop.
+                // Custom icon (Apps grid) ho to wahi, warna Material icon.
                 AnimatedScale(
                   scale: selected ? 1.12 : 1.0,
                   duration: duration,
                   curve: Curves.easeOutBack,
-                  child: Icon(
-                    selected ? widget.item.activeIcon : widget.item.icon,
-                    size: 22,
-                    // Inactive icons halke ink
-                    color: selected
-                        ? Colors.black
-                        : ink.withValues(alpha: 0.55),
-                  ),
+                  child: widget.item.customIcon != null
+                      ? widget.item.customIcon!(
+                          selected ? Colors.black : ink.withValues(alpha: 0.55),
+                        )
+                      : Icon(
+                          selected ? widget.item.activeIcon : widget.item.icon,
+                          size: 22,
+                          // Inactive icons halke ink
+                          color: selected
+                              ? Colors.black
+                              : ink.withValues(alpha: 0.55),
+                        ),
                 ),
                 // Label achanak nahi aata — width smoothly badhti hai
                 // (AnimatedSize) aur fade hota hai (AnimatedOpacity),

@@ -142,7 +142,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: _SpeedSlider(
+                        child: SpeedSlider(
                           min: 0.5,
                           max: 3.0,
                           value: settings.sensitivity,
@@ -205,7 +205,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              _SpeedSlider(
+                              SpeedSlider(
                                 min: 0.5,
                                 max: 2.0,
                                 value: settings.motionSensitivity,
@@ -292,13 +292,17 @@ class _SettingsRow extends StatelessWidget {
 }
 
 /// Snail — gradient slider — rabbit (Mouse Speed aur Motion speed
-/// dono ke liye — ek hi style).
+/// dono ke liye — ek hi style). Settings ki sheets bhi isi ko use
+/// karti hain (is liye public hai).
 ///
 /// Drag se speed badalti hai (min–max, 0.1 steps), value turant
 /// lagti aur save hoti hai. Track par tap karo to thumb wahan
 /// animate hokar jata hai. Drag karte waqt thumb ke upar value
 /// wala bubble dikhta hai, chhorne ke thodi der baad gayab.
-class _SpeedSlider extends StatefulWidget {
+/// [formatValue] bubble (aur sheet ki value) ke liye hai — default
+/// ek decimal (e.g. "1.4"); double-tap jaisi ms values ke liye
+/// e.g. (v) => '${v.round()} ms' do.
+class SpeedSlider extends StatefulWidget {
   final double min;
   final double max;
   final double value;
@@ -306,8 +310,10 @@ class _SpeedSlider extends StatefulWidget {
   final Key sliderKey;
   final Key tooltipKey;
   final Key trackKey;
+  final String Function(double)? formatValue;
 
-  const _SpeedSlider({
+  const SpeedSlider({
+    super.key,
     required this.min,
     required this.max,
     required this.value,
@@ -315,13 +321,14 @@ class _SpeedSlider extends StatefulWidget {
     required this.sliderKey,
     required this.tooltipKey,
     required this.trackKey,
+    this.formatValue,
   });
 
   @override
-  State<_SpeedSlider> createState() => _SpeedSliderState();
+  State<SpeedSlider> createState() => SpeedSliderState();
 }
 
-class _SpeedSliderState extends State<_SpeedSlider>
+class SpeedSliderState extends State<SpeedSlider>
     with SingleTickerProviderStateMixin {
   static const double _thumbRadius = 14.0;
 
@@ -432,7 +439,10 @@ class _SpeedSliderState extends State<_SpeedSlider>
                               borderRadius: BorderRadius.circular(9),
                             ),
                             child: Text(
-                              _sensitivity.toStringAsFixed(1),
+                              (widget.formatValue ??
+                                      (v) => v.toStringAsFixed(1))(
+                                _sensitivity,
+                              ),
                               key: widget.tooltipKey,
                               style: const TextStyle(
                                 fontSize: 15,

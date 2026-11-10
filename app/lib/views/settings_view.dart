@@ -2,483 +2,286 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/auth_service.dart';
 import '../connection/discovery.dart';
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
-import 'qr_scan_page.dart';
+import '../theme.dart';
+import '../widgets/connect_sheet.dart';
+import '../widgets/mouse_controls_sheet.dart';
+import 'auth_page.dart';
+import 'profile_page.dart';
 
-class SettingsView extends StatefulWidget {
+/// Settings — Muse app ke Settings screenshot jaisa.
+///
+/// • Har row: bare outline icon + title (+ subtitle) + chevron.
+/// • Koi inline input nahi — na stepper, na slider, na switch, na
+///   text field, na segmented control. Har setting par tap karo to
+///   uski khubsurat bottom sheet khulti hai, input wahin hota hai.
+/// • Free plan / Upgrade card nahi hai — Mousify ki koi subscription
+///   nahi hai, is liye wo card copy nahi kiya.
+class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
 
-  @override
-  State<SettingsView> createState() => _SettingsViewState();
-}
-
-class _SettingsViewState extends State<SettingsView> {
-  final MousifyDiscovery _discovery = MousifyDiscovery();
-  final _hostController = TextEditingController();
-  final _portController = TextEditingController(text: '9898');
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppSettings>().loaded.then((_) {
-        if (!mounted) return;
-        final s = context.read<AppSettings>();
-        _hostController.text = s.host ?? '';
-        _portController.text = s.port.toString();
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _discovery.stop();
-    _hostController.dispose();
-    _portController.dispose();
-    super.dispose();
-  }
-
-  void _useServer(DiscoveredServer s) {
-    final settings = context.read<AppSettings>();
+  void _openProfile(BuildContext context) {
+    final auth = context.read<AuthService>();
     HapticFeedback.selectionClick();
-    settings.setHost(s.address, s.port);
-    _hostController.text = s.address;
-    _portController.text = s.port.toString();
-    _connectWithFeedback(s.address, s.port, token: settings.token);
-  }
-
-  void _manualConnect() {
-    final settings = context.read<AppSettings>();
-    final host = _hostController.text.trim();
-    final port = int.tryParse(_portController.text.trim()) ?? 9898;
-    if (host.isEmpty || port < 1 || port > 65535) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid IP and port (e.g. 192.168.1.10 : 9898)'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    HapticFeedback.selectionClick();
-    settings.setHost(host, port);
-    _connectWithFeedback(host, port, token: settings.token);
-  }
-
-  Future<void> _connectWithFeedback(
-    String host,
-    int port, {
-    String? token,
-    String? pairCode,
-  }) async {
-    final conn = context.read<MousifyConnection>();
-    conn.connect(host, port, token: token, pairCode: pairCode);
-
-    var ok = false;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _ConnectingDialog(
-        host: host,
-        port: port,
-        onDone: (v) {
-          ok = v;
-          Navigator.of(ctx).pop();
-        },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            auth.isSignedIn ? const ProfilePage() : const AuthPage(),
       ),
     );
-    if (!mounted) return;
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connected to ${conn.hostName ?? host}:$port'),
-          duration: const Duration(milliseconds: 1500),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => _ErrorDialog(
-        host: host,
-        port: port,
-      ),
-    );
-  }
-
-  Future<void> _scanQr() async {
-    final settings = context.read<AppSettings>();
-    HapticFeedback.selectionClick();
-    final info = await Navigator.of(context).push<QrConnectInfo>(
-      MaterialPageRoute<QrConnectInfo>(builder: (_) => const QrScanPage()),
-    );
-    if (info == null || !mounted) return;
-    settings.setHost(info.host, info.port);
-    if (info.token != null) settings.setToken(info.token!);
-    _hostController.text = info.host;
-    _portController.text = info.port.toString();
-    await _connectWithFeedback(info.host, info.port, token: settings.token);
-  }
-
-  Future<void> _pairDialog() async {
-    final settings = context.read<AppSettings>();
-    final host = settings.host;
-    if (host == null || host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Select a server or enter the IP first'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    final codeController = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => _PairDialog(
-        codeController: codeController,
-        onPair: (code) {
-          Navigator.of(ctx).pop();
-          _connectWithFeedback(host, settings.port, pairCode: code);
-        },
-      ),
-    );
-    // Dialog band ho (Cancel/back/tap-outside) to keyboard bhi
-    // band ho — autofocus wala number field focus na rakhe.
-    if (mounted) FocusScope.of(context).unfocus();
-    codeController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
     final conn = context.watch<MousifyConnection>();
+    final auth = context.watch<AuthService>();
     final scheme = Theme.of(context).colorScheme;
+    final user = auth.currentUser;
+    final connected = conn.state == ConnState.connected;
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            automaticallyImplyLeading: false,
-            pinned: true,
-            expandedHeight: 110,
-            centerTitle: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: true,
-              titlePadding: const EdgeInsets.only(bottom: 16),
-              title: const Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      scheme.primary.withValues(alpha: 0.15),
-                      scheme.primary.withValues(alpha: 0.05),
-                    ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Title — screenshot jaisa center me (tab hai, is liye
+              // back button nahi).
+              const Padding(
+                padding: EdgeInsets.fromLTRB(4, 8, 4, 20),
+                child: Text(
+                  'Settings',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ================= CONNECTION =================
-                _SectionTitle(context, 'CONNECTION'),
-                _Card(
-                  child: Column(
-                    children: [
-                      _ConnectionHeader(
-                        state: conn.state,
-                        hostName: conn.hostName,
-                        host: conn.host,
-                        port: conn.port,
-                        lastError: conn.lastError,
-                        onDisconnect: conn.state == ConnState.connected
-                            ? conn.disconnect
-                            : null,
-                        onConnect: conn.state != ConnState.connected
-                            ? _manualConnect
-                            : null,
-                      ),
-                      const Divider(height: 1),
-                      _SettingsRow(
-                        icon: Icons.qr_code_scanner,
-                        title: 'Connect via QR code',
-                        subtitle: 'PC screen par QR scan karke jaldi connect karein',
-                        onTap: _scanQr,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.key_outlined,
-                        title: 'Pair with 6-digit code',
-                        subtitle: 'PC app se pairing code lein aur yahan enter karein',
-                        onTap: _pairDialog,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
 
-                // ================= NEARBY =================
-                _SectionTitle(context, 'NEARBY SERVERS'),
-                _Card(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        dense: true,
-                        title: Text(
-                          _discovery.scanning ? 'Searching…' : 'Scan karo',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        trailing: _discovery.scanning
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : IconButton(
-                                tooltip: 'Scan again',
-                                icon: const Icon(Icons.refresh),
-                                onPressed: _discovery.start,
-                              ),
-                      ),
-                      if (_discovery.servers.isNotEmpty)
-                        ..._discovery.servers.map((s) => _ServerTile(
-                              server: s,
-                              isActive:
-                                  settings.host == s.address &&
-                                      settings.port == s.port,
-                              onTap: () => _useServer(s),
-                            ))
-                      else
-                        const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Text(
-                            'Koi nearby server nahi mila',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontStyle: FontStyle.italic,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ================= MANUAL =================
-                _SectionTitle(context, 'MANUAL IP & PORT'),
-                _Card(
+              // ================= PROFILE =================
+              _GroupCard(
+                radius: 28,
+                child: InkWell(
+                  onTap: () => _openProfile(context),
+                  borderRadius: BorderRadius.circular(28),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _hostController,
-                                decoration: const InputDecoration(
-                                  labelText: 'PC IP address',
-                                  hintText: '192.168.1.10',
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              width: 92,
-                              child: TextField(
-                                controller: _portController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Port',
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _manualConnect,
-                            icon: const Icon(Icons.lan_outlined, size: 18),
-                            label: const Text('Connect'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ================= INPUT =================
-                _SectionTitle(context, 'INPUT SETTINGS'),
-                _Card(
-                  child: Column(
-                    children: [
-                      _SliderTile(
-                        context,
-                        label: 'Pointer sensitivity',
-                        valueText: settings.sensitivity.toStringAsFixed(1),
-                        onMinus: () => settings.setSensitivity(
-                            (settings.sensitivity - 0.1).clamp(0.5, 3.0)),
-                        onPlus: () => settings.setSensitivity(
-                            (settings.sensitivity + 0.1).clamp(0.5, 3.0)),
-                      ),
-                      _SliderTile(
-                        context,
-                        label: 'Scroll speed',
-                        valueText: settings.scrollSpeed.toStringAsFixed(1),
-                        onMinus: () => settings.setScrollSpeed(
-                            (settings.scrollSpeed - 0.1).clamp(0.5, 3.0)),
-                        onPlus: () => settings.setScrollSpeed(
-                            (settings.scrollSpeed + 0.1).clamp(0.5, 3.0)),
-                      ),
-                      _SliderTile(
-                        context,
-                        label: 'Wheel sensitivity',
-                        valueText: settings.wheelSensitivity.toStringAsFixed(1),
-                        onMinus: () => settings.setWheelSensitivity(
-                            (settings.wheelSensitivity - 0.1).clamp(0.5, 3.0)),
-                        onPlus: () => settings.setWheelSensitivity(
-                            (settings.wheelSensitivity + 0.1).clamp(0.5, 3.0)),
-                      ),
-                      SwitchListTile(
-                        title: const Text('Natural scrolling'),
-                        subtitle: const Text(
-                          'Scroll direction ulat kar dein',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: settings.naturalScroll,
-                        onChanged: settings.setNaturalScroll,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      _SliderTile(
-                        context,
-                        label: 'Double-tap speed',
-                        valueText: '${settings.doubleTapSpeed.round()} ms',
-                        onMinus: () => settings.setDoubleTapSpeed(
-                            (settings.doubleTapSpeed - 25).clamp(200, 500)),
-                        onPlus: () => settings.setDoubleTapSpeed(
-                            (settings.doubleTapSpeed + 25).clamp(200, 500)),
-                      ),
-                      const ListTile(
-                        dense: true,
-                        leading: Icon(Icons.bolt_rounded, size: 20),
-                        title: Text('Double-tap the touchpad'),
-                        subtitle: Text(
-                          'Opens the live composer on a typing spot',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ================= APPEARANCE =================
-                _SectionTitle(context, 'APPEARANCE'),
-                _Card(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    padding: const EdgeInsets.all(18),
                     child: Row(
                       children: [
-                        const Expanded(
-                          child: Text(
-                            'Theme',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: user != null
+                                ? scheme.primary
+                                : scheme.surface,
+                            border: user == null
+                                ? Border.all(color: scheme.outline, width: 1.4)
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: user != null
+                              ? Text(
+                                  user.initials,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onPrimary,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 28,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user?.name ?? 'Guest',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                user?.email ?? 'Tap to sign in to Mousify',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(
-                              value: true,
-                              icon: Icon(Icons.dark_mode, size: 20),
-                              label: Text('Dark'),
-                            ),
-                            ButtonSegment(
-                              value: false,
-                              icon: Icon(Icons.light_mode, size: 20),
-                              label: Text('Light'),
-                            ),
-                          ],
-                          selected: {settings.isDark},
-                          onSelectionChanged: (sel) => settings.setDark(sel.first),
-                          showSelectedIcon: false,
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 26,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-              ]),
-            ),
+              ),
+              const SizedBox(height: 16),
+
+              // ================= CONNECTION =================
+              _GroupCard(
+                child: Column(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.wifi_outlined,
+                      title: 'Connection',
+                      subtitle: connected
+                          ? 'Connected to ${conn.hostName ?? 'PC'}'
+                          : conn.state == ConnState.connecting
+                              ? 'Connecting…'
+                              : 'Offline',
+                      onTap: () => showConnectSheet(context),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.radar_outlined,
+                      title: 'Nearby servers',
+                      subtitle: 'See PCs on your Wi-Fi',
+                      onTap: () => _openServersSheet(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ================= MOUSE =================
+              _GroupCard(
+                child: Column(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.speed_outlined,
+                      title: 'Pointer sensitivity',
+                      subtitle: settings.sensitivity.toStringAsFixed(1),
+                      onTap: () => _openSliderSheet(
+                        context,
+                        title: 'Pointer sensitivity',
+                        min: 0.5,
+                        max: 3.0,
+                        getValue: (s) => s.sensitivity,
+                        setValue: (s, v) => s.setSensitivity(v),
+                      ),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.swap_vert_outlined,
+                      title: 'Scroll speed',
+                      subtitle: settings.scrollSpeed.toStringAsFixed(1),
+                      onTap: () => _openSliderSheet(
+                        context,
+                        title: 'Scroll speed',
+                        min: 0.5,
+                        max: 3.0,
+                        getValue: (s) => s.scrollSpeed,
+                        setValue: (s, v) => s.setScrollSpeed(v),
+                      ),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.mouse_outlined,
+                      title: 'Wheel sensitivity',
+                      subtitle: settings.wheelSensitivity.toStringAsFixed(1),
+                      onTap: () => _openSliderSheet(
+                        context,
+                        title: 'Wheel sensitivity',
+                        min: 0.5,
+                        max: 3.0,
+                        getValue: (s) => s.wheelSensitivity,
+                        setValue: (s, v) => s.setWheelSensitivity(v),
+                      ),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.bolt_outlined,
+                      title: 'Double-tap speed',
+                      subtitle: '${settings.doubleTapSpeed.round()} ms',
+                      onTap: () => _openSliderSheet(
+                        context,
+                        title: 'Double-tap speed',
+                        min: 200,
+                        max: 500,
+                        getValue: (s) => s.doubleTapSpeed,
+                        setValue: (s, v) => s.setDoubleTapSpeed(v),
+                        formatValue: (v) => '${v.round()} ms',
+                      ),
+                    ),
+                    const _RowDivider(),
+                    _SettingsRow(
+                      icon: Icons.swap_vertical_circle_outlined,
+                      title: 'Natural scrolling',
+                      subtitle:
+                          settings.naturalScroll ? 'On' : 'Off',
+                      onTap: () => _openNaturalScrollSheet(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ================= APPEARANCE =================
+              _GroupCard(
+                child: _SettingsRow(
+                  icon: Icons.dark_mode_outlined,
+                  title: 'Appearance',
+                  subtitle: settings.isDark ? 'Dark' : 'Light',
+                  onTap: () => _openAppearanceSheet(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ================= ABOUT =================
+              _GroupCard(
+                child: _SettingsRow(
+                  icon: Icons.info_outline_rounded,
+                  title: 'About Mousify',
+                  subtitle: 'Version 1.0.0',
+                  onTap: () => _openAboutSheet(context),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final BuildContext context;
-  final String title;
-
-  const _SectionTitle(this.context, this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 }
 
-class _Card extends StatelessWidget {
+/// Bada gol card — inspiration wale settings jaisa, flat matte.
+class _GroupCard extends StatelessWidget {
   final Widget child;
+  final double radius;
 
-  const _Card({required this.child});
+  const _GroupCard({required this.child, this.radius = 24});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Material (Container nahi) — andar ke ListTile ki ink splash
-    // DecoratedBox ke peeche chhup jati hai, warna framework error aata hai.
     return Material(
       color: scheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(radius),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -486,136 +289,535 @@ class _Card extends StatelessWidget {
   }
 }
 
-class _ConnectionHeader extends StatelessWidget {
-  final ConnState state;
-  final String? hostName;
-  final String? host;
-  final int port;
-  final String? lastError;
-  final VoidCallback? onDisconnect;
-  final VoidCallback? onConnect;
-
-  const _ConnectionHeader({
-    required this.state,
-    this.hostName,
-    this.host,
-    required this.port,
-    this.lastError,
-    this.onDisconnect,
-    this.onConnect,
-  });
+/// Rows ke beech wali divider — icon ke baad se shuru.
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final connected = state == ConnState.connected;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: connected ? Colors.green : Colors.grey,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  connected
-                      ? 'Connected to ${hostName ?? 'PC'}'
-                      : state == ConnState.connecting
-                          ? 'Connecting…'
-                          : state == ConnState.waitingPair
-                              ? 'Pairing required'
-                              : 'Offline',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  connected
-                      ? '${host ?? 'no IP'}:$port'
-                      : lastError ??
-                          '${host ?? 'No PC set yet'}:$port',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          connected
-              ? IconButton(
-                  tooltip: 'Disconnect',
-                  icon: const Icon(Icons.stop_circle_outlined, size: 28),
-                  color: Colors.red,
-                  onPressed: onDisconnect,
-                )
-              : FilledButton(
-                  onPressed: onConnect,
-                  child: const Text('Connect'),
-                ),
-        ],
-      ),
+    return Divider(
+      height: 1,
+      indent: 58,
+      color: Theme.of(context).colorScheme.outline,
     );
   }
 }
 
+/// Screenshot jaisi row: bare outline icon + title (+ subtitle) +
+/// side me chevron. Koi tile, koi inline control nahi — tap par
+/// uski bottom sheet khulti hai.
 class _SettingsRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _SettingsRow({
     required this.icon,
     required this.title,
     this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                onTap!();
+              },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 24, color: scheme.onSurface),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 24,
+                  color: scheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ================= BOTTOM SHEETS =================
+
+/// Har setting ki khubsurat bottom sheet — connect/mouse sheet
+/// jaisi style (drag handle, gol top, flat matte).
+Future<void> _openSheet(
+  BuildContext context, {
+  required String title,
+  required Widget child,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _SettingsSheet(title: title, child: child),
+  );
+}
+
+class _SettingsSheet extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SettingsSheet({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    return Material(
+      color: AppColors.chip(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          10,
+          20,
+          20 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: scheme.outline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(child: child),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Slider wali sheet — bada value label + gradient slider
+/// (snail–rabbit, mouse sheet wala).
+void _openSliderSheet(
+  BuildContext context, {
+  required String title,
+  required double min,
+  required double max,
+  required double Function(AppSettings) getValue,
+  required void Function(AppSettings, double) setValue,
+  String Function(double)? formatValue,
+}) {
+  _openSheet(
+    context,
+    title: title,
+    child: _SliderSheetContent(
+      title: title,
+      min: min,
+      max: max,
+      getValue: getValue,
+      setValue: setValue,
+      formatValue: formatValue,
+    ),
+  );
+}
+
+class _SliderSheetContent extends StatelessWidget {
+  final String title;
+  final double min;
+  final double max;
+  final double Function(AppSettings) getValue;
+  final void Function(AppSettings, double) setValue;
+  final String Function(double)? formatValue;
+
+  const _SliderSheetContent({
+    required this.title,
+    required this.min,
+    required this.max,
+    required this.getValue,
+    required this.setValue,
+    this.formatValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    final value = getValue(settings);
+    final label =
+        (formatValue ?? (v) => v.toStringAsFixed(1))(value);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 16),
+        SpeedSlider(
+          min: min,
+          max: max,
+          value: value,
+          onChanged: (v) => setValue(settings, v),
+          sliderKey: ValueKey('$title-slider'),
+          tooltipKey: ValueKey('$title-tooltip'),
+          trackKey: ValueKey('$title-track'),
+          formatValue: formatValue,
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// Natural scrolling ki sheet — switch ke saath.
+void _openNaturalScrollSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'Natural scrolling',
+    child: const _NaturalScrollSheetContent(),
+  );
+}
+
+class _NaturalScrollSheetContent extends StatelessWidget {
+  const _NaturalScrollSheetContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Natural scrolling',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Scroll direction ulat kar dein',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          value: settings.naturalScroll,
+          onChanged: settings.setNaturalScroll,
+        ),
+      ],
+    );
+  }
+}
+
+/// Appearance ki sheet — Dark / Light options, check ke saath.
+void _openAppearanceSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'Appearance',
+    child: const _AppearanceSheetContent(),
+  );
+}
+
+class _AppearanceSheetContent extends StatelessWidget {
+  const _AppearanceSheetContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _OptionRow(
+          icon: Icons.dark_mode_outlined,
+          label: 'Dark',
+          selected: settings.isDark,
+          onTap: () {
+            settings.setDark(true);
+            Navigator.of(context).pop();
+          },
+        ),
+        _OptionRow(
+          icon: Icons.light_mode_outlined,
+          label: 'Light',
+          selected: !settings.isDark,
+          onTap: () {
+            settings.setDark(false);
+            Navigator.of(context).pop();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _OptionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OptionRow({
+    required this.icon,
+    required this.label,
+    required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, color: scheme.onSurface),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 24, color: scheme.onSurface),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_rounded, size: 24, color: scheme.primary),
+            ],
+          ),
+        ),
       ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle!,
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            )
-          : null,
-      trailing: Icon(
-        Icons.chevron_right,
-        color: scheme.onSurfaceVariant,
-      ),
-      onTap: onTap,
     );
   }
 }
 
-class _ServerTile extends StatelessWidget {
+/// About ki sheet.
+void _openAboutSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'About Mousify',
+    child: const _AboutSheetContent(),
+  );
+}
+
+class _AboutSheetContent extends StatelessWidget {
+  const _AboutSheetContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Mousify',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Version 1.0.0',
+          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Made by Aorigoon',
+          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Your phone is the mouse now — turn it into a trackpad '
+          'and keyboard for your PC.',
+          style: TextStyle(fontSize: 14, color: scheme.onSurface, height: 1.5),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// Nearby servers ki sheet — discovery list, tap par connect.
+void _openServersSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'Nearby servers',
+    child: _ServersSheet(parentContext: context),
+  );
+}
+
+class _ServersSheet extends StatefulWidget {
+  final BuildContext parentContext;
+
+  const _ServersSheet({required this.parentContext});
+
+  @override
+  State<_ServersSheet> createState() => _ServersSheetState();
+}
+
+class _ServersSheetState extends State<_ServersSheet> {
+  final MousifyDiscovery _discovery = MousifyDiscovery();
+
+  @override
+  void initState() {
+    super.initState();
+    _discovery.start();
+  }
+
+  @override
+  void dispose() {
+    _discovery.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    final scheme = Theme.of(context).colorScheme;
+    return ListenableBuilder(
+      listenable: _discovery,
+      builder: (context, _) {
+        if (_discovery.servers.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                if (_discovery.scanning)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Icon(
+                    Icons.wifi_find_outlined,
+                    size: 22,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _discovery.scanning
+                        ? 'Searching for nearby PCs…'
+                        : 'Koi nearby server nahi mila',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (!_discovery.scanning)
+                  TextButton(
+                    onPressed: _discovery.start,
+                    child: const Text('Scan again'),
+                  ),
+              ],
+            ),
+          );
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ..._discovery.servers.map((s) {
+              final isActive = settings.host == s.address &&
+                  settings.port == s.port;
+              return _ServerRow(
+                server: s,
+                isActive: isActive,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _connectToServer(widget.parentContext, s);
+                },
+              );
+            }),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _discovery.start,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Scan again'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ServerRow extends StatelessWidget {
   final DiscoveredServer server;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _ServerTile({
+  const _ServerRow({
     required this.server,
     required this.isActive,
     required this.onTap,
@@ -624,147 +826,117 @@ class _ServerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return ListTile(
-      dense: true,
-      leading: const Icon(Icons.computer_outlined),
-      title: Text(server.name),
-      subtitle: Text('${server.address}:${server.port}'),
-      trailing: isActive
-          ? Icon(Icons.check_circle, color: scheme.primary)
-          : Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-      onTap: onTap,
-    );
-  }
-}
-
-class _SliderTile extends StatelessWidget {
-  final BuildContext context;
-  final String label;
-  final String valueText;
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
-
-  const _SliderTile(
-    this.context, {
-    required this.label,
-    required this.valueText,
-    required this.onMinus,
-    required this.onPlus,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-          _StepBtn(context, Icons.remove_rounded, onMinus),
-          Container(
-            width: 76,
-            alignment: Alignment.center,
-            child: Text(
-              valueText,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.computer_outlined,
+                size: 24,
+                color: scheme.onSurface,
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      server.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${server.address}:${server.port}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isActive)
+                Icon(Icons.check_circle, color: scheme.primary)
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 24,
+                  color: scheme.onSurfaceVariant,
+                ),
+            ],
           ),
-          _StepBtn(context, Icons.add_rounded, onPlus),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _StepBtn extends StatelessWidget {
-  final BuildContext context;
-  final IconData icon;
-  final VoidCallback onTap;
+/// Server par tap — host save karo, connect karo (dialogs ke saath).
+Future<void> _connectToServer(
+  BuildContext context,
+  DiscoveredServer s,
+) async {
+  final settings = context.read<AppSettings>();
+  settings.setHost(s.address, s.port);
+  await _connectWithFeedback(
+    context,
+    s.address,
+    s.port,
+    token: settings.token,
+  );
+}
 
-  const _StepBtn(this.context, this.icon, this.onTap);
+Future<void> _connectWithFeedback(
+  BuildContext context,
+  String host,
+  int port, {
+  String? token,
+}) async {
+  final conn = context.read<MousifyConnection>();
+  conn.connect(host, port, token: token);
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      customBorder: const CircleBorder(),
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
+  var ok = false;
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => _ConnectingDialog(
+      host: host,
+      port: port,
+      onDone: (v) {
+        ok = v;
+        Navigator.of(ctx).pop();
       },
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: scheme.surface,
-          border: Border.all(color: scheme.outline),
-        ),
-        child: Icon(icon, size: 18, color: scheme.onSurface),
+    ),
+  );
+  if (!context.mounted) return;
+  if (ok) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Connected to ${conn.hostName ?? host}:$port'),
+        duration: const Duration(milliseconds: 1500),
+        behavior: SnackBarBehavior.floating,
       ),
     );
+    return;
   }
-}
-
-/// Pair dialog with 6-digit code input.
-class _PairDialog extends StatelessWidget {
-  final TextEditingController codeController;
-  final ValueChanged<String> onPair;
-
-  const _PairDialog({
-    required this.codeController,
-    required this.onPair,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      title: const Text('Pair with 6-digit code'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'On the PC open the Mousify app → "Show pairing code", '
-            'then enter it here:',
-            style: TextStyle(
-              fontSize: 13.5,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: codeController,
-            autofocus: true,
-            maxLength: 6,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(hintText: '6-digit code'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final code = codeController.text.trim();
-            if (code.length != 6) return;
-            onPair(code);
-          },
-          child: const Text('Pair'),
-        ),
-      ],
-    );
-  }
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => _ErrorDialog(
+      host: host,
+      port: port,
+    ),
+  );
 }
 
 /// Connecting spinner dialog.

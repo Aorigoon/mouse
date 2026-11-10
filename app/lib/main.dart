@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'auth/auth_service.dart';
 import 'connection/server_connection.dart';
 import 'connection/settings_store.dart';
 import 'theme.dart';
@@ -19,6 +20,7 @@ class MousifyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AppSettings()),
         ChangeNotifierProvider(create: (_) => MousifyConnection()),
+        ChangeNotifierProvider(create: (_) => AuthService()),
       ],
       child: Consumer<AppSettings>(
         builder: (context, settings, _) {
