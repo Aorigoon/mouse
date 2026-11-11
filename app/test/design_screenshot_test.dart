@@ -467,6 +467,7 @@ void main() {
 
     // Keyboard simulate — search bar keyboard ke upar overlay hona chahiye.
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -475,8 +476,8 @@ void main() {
     // hokar) — search bar seedha keyboard ke upar hota hai: bar ka
     // neeche wala kinara keyboard ke top (844-150=694, fake keyboard
     // 300 physical = 150 logical) se sirf ~16px upar hona chahiye.
-    // Bar ki position focus se chalti hai (viewInsets yahan hamesha 0
-    // hota hai — outer Scaffold inset hata deta hai).
+    // Bar ki position keyboard ke asli haal se chalti hai (raw view
+    // insets — Scaffold wala MediaQuery yahan hamesha 0 hota hai).
     final positioned = tester.widget<AnimatedPositioned>(
       find.byType(AnimatedPositioned).first,
     );
@@ -487,6 +488,52 @@ void main() {
     await expectLater(
       find.byType(MousifyApp),
       matchesGoldenFile('goldens/apps_search_keyboard.png'),
+    );
+  });
+
+  testWidgets('apps search bar - keyboard band hone par bar wapas nav ke upar',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    // Phone size: 390x844 @ 2x
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Apps tab par jao, search bar par tap karo, keyboard kholo.
+    await tester.tap(find.byType(AppsGridIcon));
+    await tester.pumpAndSettle();
+    expect(find.byType(DockPage), findsOneWidget);
+    await tester.tap(find.byType(TextField));
+    await tester.pump(const Duration(milliseconds: 400));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester
+          .widget<AnimatedPositioned>(find.byType(AnimatedPositioned).first)
+          .bottom,
+      16,
+    );
+
+    // Android back jaisa: keyboard band karo, focus rehne do (back
+    // par focus rehta hai) — bar ko wapas 112 (nav ke upar) par
+    // aana chahiye, nav ke peeche nahi (Zain ki screenshot wali bug).
+    tester.view.viewInsets = const FakeViewPadding(bottom: 0);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester
+          .widget<AnimatedPositioned>(find.byType(AnimatedPositioned).first)
+          .bottom,
+      112,
     );
   });
 }

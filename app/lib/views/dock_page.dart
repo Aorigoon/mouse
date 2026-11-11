@@ -23,7 +23,7 @@ class DockPage extends StatefulWidget {
   State<DockPage> createState() => _DockPageState();
 }
 
-class _DockPageState extends State<DockPage> {
+class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
   List<_AppInfo> _apps = [];
   bool _loading = true;
   bool _error = false;
@@ -37,10 +37,14 @@ class _DockPageState extends State<DockPage> {
   final _focusNode = FocusNode();
   String _query = '';
   bool _isSearchFocused = false;
+  // Keyboard pehle khula tha ya nahi — band hone par focus hatane
+  // ke liye chahiye (neeche didChangeMetrics dekho).
+  bool _wasKeyboardOpen = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _conn = context.read<MousifyConnection>();
     _sub = _conn.events.listen(_onEvent);
     _connListener = () {
@@ -54,6 +58,7 @@ class _DockPageState extends State<DockPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _sub?.cancel();
     _conn.removeListener(_connListener);
     _queryController.removeListener(_onQueryChanged);
@@ -61,6 +66,24 @@ class _DockPageState extends State<DockPage> {
     _focusNode.removeListener(_onFocusChange);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    // Keyboard ka asli haal — raw view insets se. Keyboard band hua
+    // aur field abhi bhi focused hai (Android back par keyboard
+    // band hota hai, focus rehta hai) to focus hata do, taaki bar
+    // wapas apni jagah (112, nav ke upar) aa jaye aur pill bhi
+    // chhota ho jaye. `_wasKeyboardOpen` guard is liye hai taaki
+    // keyboard khulte waqt ki pehli 0-reading par focus na hate.
+    final keyboardOpen =
+        MediaQueryData.fromView(View.of(context)).viewInsets.bottom > 0;
+    if (_wasKeyboardOpen && !keyboardOpen && _focusNode.hasFocus) {
+      _focusNode.unfocus();
+    }
+    _wasKeyboardOpen = keyboardOpen;
+    setState(() {});
   }
 
   void _onQueryChanged() {
@@ -172,6 +195,17 @@ class _DockPageState extends State<DockPage> {
         .where((a) => !settings.pinnedApps.contains(a.id))
         .toList();
 
+    // Keyboard ka asli haal — raw view insets se. MediaQuery.of ka
+    // viewInsets yahan hamesha 0 hota hai (HomeShell ka outer
+    // Scaffold apni body ke MediaQuery se bottom inset hata deta
+    // hai), is liye us se nahi chalta. Focus se bhi nahi chalta:
+    // Android back par keyboard band hota hai, focus rehta hai —
+    // bar 16 par atka rehta tha aur nav ke peeche chala jata tha
+    // (Zain ki screenshot wali shikayat). fromView wala inset
+    // Scaffold se nahi kat-ta, is liye ye sahi signal hai.
+    final keyboardOpen =
+        MediaQueryData.fromView(View.of(context)).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: AppBar(
@@ -199,22 +233,14 @@ class _DockPageState extends State<DockPage> {
             ],
           ),
           // Floating search bar — keyboard band ho to floating nav
-          // ke upar (bottom 112); search field focused ho (keyboard
-          // khula) to seedha keyboard ke upar (bottom 16).
-          //
-          // NOTE: MediaQuery viewInsets.bottom yahan hamesha 0 hota
-          // hai — HomeShell ka outer Scaffold apni body ke MediaQuery
-          // se bottom inset hata deta hai (removeBottomInset), is liye
-          // keyboard ka pata us se nahi chalta aur bar 112 par atka
-          // rehta tha (keyboard se ~112px upar — Zain ki shikayat).
-          // Focus hi sahi signal hai: Apps page par sirf yehi field
-          // hai, focused = keyboard khula.
+          // ke upar (bottom 112); keyboard khula ho to seedha
+          // keyboard ke upar (bottom 16).
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
             left: 16,
             right: 16,
-            bottom: _isSearchFocused ? 16 : 112,
+            bottom: keyboardOpen ? 16 : 112,
             child: _BeautifulSearchBar(
               controller: _queryController,
               focusNode: _focusNode,
