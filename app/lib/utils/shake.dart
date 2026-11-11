@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'haptics.dart';
 import 'dart:math';
 
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 /// Phone shake detect karta hai — accelerometer magnitude spike se.
@@ -32,7 +33,7 @@ class ShakeDetector {
     final now = DateTime.now();
     if (now.difference(_lastShake) < cooldown) return;
     _lastShake = now;
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     onShake();
   }
 

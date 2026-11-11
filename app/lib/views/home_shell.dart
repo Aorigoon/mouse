@@ -1,7 +1,7 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -188,7 +188,7 @@ class _HomeShellState extends State<HomeShell> {
                   ? const NeverScrollableScrollPhysics()
                   : const ClampingScrollPhysics(),
               onPageChanged: (i) {
-                HapticFeedback.selectionClick();
+                Haptics.click();
                 // Tab badla — pichle tab ka field (Settings IP/port)
                 // focus na rakhe, warna keyboard touchpad par khula rehta hai.
                 FocusManager.instance.primaryFocus?.unfocus();
@@ -232,7 +232,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _goTo(int i) {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     // Tab badla — pichle tab ka field (Settings IP/port) focus na
     // rakhe, warna keyboard touchpad par khula rehta hai.
     FocusManager.instance.primaryFocus?.unfocus();

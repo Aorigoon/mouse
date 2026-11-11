@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../utils/haptics.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +47,7 @@ class _AuthPageState extends State<AuthPage> {
       final ok = await auth.signInWithGoogle();
       if (!mounted) return;
       if (ok) {
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
         Navigator.of(context).pop();
       }
     } on AuthException catch (e) {

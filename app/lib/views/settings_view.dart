@@ -1,233 +1,413 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
+import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/auth_service.dart';
 import '../connection/discovery.dart';
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../theme.dart';
 import '../widgets/connect_sheet.dart';
 import '../widgets/mouse_controls_sheet.dart';
+import 'auth_page.dart';
 import 'legal_page.dart';
+import 'profile_page.dart';
 
-/// Settings — Muse app ke Settings screenshot jaisa.
+/// Settings — Muse app ke Settings screenshot jaisa, v5.
 ///
-/// • Bada left title ("Settings"), koi back button nahi (tab hai).
+/// • Upar blur header (iOS large title jaisa): bara left "Settings"
+///   scroll hokar upar jata hai, upar ek blur (frosted) wali patti me
+///   "Settings" center me aa jata hai.
+/// • Pehla card — Profile box: Profile (avatar + naam + email,
+///   tap → ProfilePage / AuthPage), Appearance, Haptic feedback
+///   (seedha toggle, koi sheet nahi).
+/// • Phir Connection, Mouse (Natural scrolling seedha toggle),
+///   Legal (About, FAQ, Privacy Policy, Terms of Service, Contact —
+///   Contact aakhir me).
 /// • Har row: bare outline icon + title + chevron — koi subtitle
-///   nahi (values bahar nahi dikhti — na 1.4, na 350 ms, na On/Off),
-///   is liye rows chhoti aur jagah kam.
-/// • Koi inline input nahi — har setting par tap karo to uski
-///   khubsurat bottom sheet khulti hai, input wahin hota hai.
+///   nahi (values bahar nahi dikhti — na 1.4, na 350 ms, na On/Off).
 /// • Cards dark mode me gray hain (#262628, flat matte) — kaale nahi.
-/// • Profile card nahi hai (Zain: uski zaroorat nahi).
-/// • Three-dot wali mouse sheet ki settings yahan bhi hain —
-///   Scroll speed, Natural scrolling, Motion Control (+ Motion
-///   speed) — dono jagah ek hi AppSettings par chalte hain.
-/// • Neeche ek hi card me About, FAQ, Contact, Privacy Policy
-///   aur Terms of Service (screenshot wale card jaisa).
+/// • Appearance sheet Composer ke actions sheet jaisi hai (koi title
+///   ya X nahi — drag handle + ek raised card me Light/Dark/System).
 /// • Free plan / Upgrade card nahi hai — Mousify ki koi subscription
 ///   nahi hai, is liye wo card copy nahi kiya.
-class SettingsView extends StatelessWidget {
+class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  final ScrollController _scrollController = ScrollController();
+  bool _showBar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final show = _scrollController.offset > 48;
+    if (show != _showBar) setState(() => _showBar = show);
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final settings = context.watch<AppSettings>();
 
     return Scaffold(
       backgroundColor: scheme.surface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Bada left title — screenshot jaisa.
-              const Padding(
-                padding: EdgeInsets.fromLTRB(4, 8, 4, 20),
-                child: Text(
-                  'Settings',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Bada left title — screenshot jaisa. Scroll par
+                  // upar chala jata hai, blur bar aa jata hai.
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(4, 8, 4, 20),
+                    child: Text(
+                      'Settings',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ),
+
+                  // Section label — card ke upar "Profile" likha ho.
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    child: Text(
+                      'Profile',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+
+                  // ================= PROFILE BOX =================
+                  // Profile + Appearance + Haptic feedback — ek hi card.
+                  _GroupCard(
+                    child: Column(
+                      children: [
+                        _ProfileRow(
+                          onTap: () => _openProfile(context),
+                        ),
+                        const _RowDivider(indent: 82),
+                        _SettingsRow(
+                          icon: Icons.dark_mode_outlined,
+                          title: 'Appearance',
+                          onTap: () => _openAppearanceSheet(context),
+                        ),
+                        const _RowDivider(),
+                        _ToggleRow(
+                          icon: Icons.vibration_outlined,
+                          title: 'Haptic feedback',
+                          value: settings.hapticFeedback,
+                          onChanged: settings.setHapticFeedback,
+                          switchKey: const Key('haptic-feedback-switch'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ================= CONNECTION =================
+                  _GroupCard(
+                    child: Column(
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.wifi_outlined,
+                          title: 'Connection',
+                          onTap: () => showConnectSheet(context),
+                        ),
+                        const _RowDivider(),
+                        _SettingsRow(
+                          icon: Icons.radar_outlined,
+                          title: 'Nearby servers',
+                          onTap: () => _openServersSheet(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ================= MOUSE =================
+                  // Three-dot wali mouse sheet ki settings yahan bhi hain.
+                  // Natural scrolling seedha toggle hai (koi sheet nahi).
+                  _GroupCard(
+                    child: Column(
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.speed_outlined,
+                          title: 'Pointer sensitivity',
+                          onTap: () => _openSliderSheet(
+                            context,
+                            title: 'Pointer sensitivity',
+                            min: 0.5,
+                            max: 3.0,
+                            getValue: (s) => s.sensitivity,
+                            setValue: (s, v) => s.setSensitivity(v),
+                          ),
+                        ),
+                        const _RowDivider(),
+                        _SettingsRow(
+                          icon: Icons.swap_vert_outlined,
+                          title: 'Scroll speed',
+                          onTap: () => _openSliderSheet(
+                            context,
+                            title: 'Scroll speed',
+                            min: 0.5,
+                            max: 3.0,
+                            getValue: (s) => s.scrollSpeed,
+                            setValue: (s, v) => s.setScrollSpeed(v),
+                          ),
+                        ),
+                        const _RowDivider(),
+                        _SettingsRow(
+                          icon: Icons.mouse_outlined,
+                          title: 'Wheel sensitivity',
+                          onTap: () => _openSliderSheet(
+                            context,
+                            title: 'Wheel sensitivity',
+                            min: 0.5,
+                            max: 3.0,
+                            getValue: (s) => s.wheelSensitivity,
+                            setValue: (s, v) => s.setWheelSensitivity(v),
+                          ),
+                        ),
+                        const _RowDivider(),
+                        _SettingsRow(
+                          icon: Icons.bolt_outlined,
+                          title: 'Double-tap speed',
+                          onTap: () => _openSliderSheet(
+                            context,
+                            title: 'Double-tap speed',
+                            min: 200,
+                            max: 500,
+                            getValue: (s) => s.doubleTapSpeed,
+                            setValue: (s, v) => s.setDoubleTapSpeed(v),
+                            formatValue: (v) => '${v.round()} ms',
+                          ),
+                        ),
+                        const _RowDivider(),
+                        _ToggleRow(
+                          icon: Icons.swap_vertical_circle_outlined,
+                          title: 'Natural scrolling',
+                          value: settings.naturalScroll,
+                          onChanged: settings.setNaturalScroll,
+                          switchKey: const Key('natural-scrolling-switch'),
+                        ),
+                        const _RowDivider(),
+                        // Motion Control — seedha toggle row, koi arrow
+                        // nahi. On ho to neeche Motion speed slider
+                        // khud card me aa jata hai (koi sheet nahi).
+                        _ToggleRow(
+                          icon: Icons.screen_rotation_rounded,
+                          title: 'Motion Control',
+                          value: settings.motionControl,
+                          onChanged: settings.setMotionControl,
+                          switchKey:
+                              const Key('motion-control-switch'),
+                        ),
+                        if (settings.motionControl) ...[
+                          const _RowDivider(),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              18,
+                              10,
+                              18,
+                              12,
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'Motion speed',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      settings.motionSensitivity
+                                          .toStringAsFixed(1),
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SpeedSlider(
+                                  min: 0.5,
+                                  max: 2.0,
+                                  value: settings.motionSensitivity,
+                                  onChanged: settings.setMotionSensitivity,
+                                  sliderKey: const Key(
+                                    'settings-motion-speed-slider',
+                                  ),
+                                  tooltipKey: const Key(
+                                    'settings-motion-speed-tooltip',
+                                  ),
+                                  trackKey: const Key(
+                                    'settings-motion-speed-slider-track',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ================= ABOUT & LEGAL =================
+                  // Ek hi card me: About, FAQ, Privacy Policy,
+                  // Terms of Service, Contact (aakhir me).
+                  _GroupCard(
+                    child: Column(
+                      children: [
+                        _LegalRow(
+                          title: 'About',
+                          onTap: () => _openLegalPage(
+                            context,
+                            title: 'About Mousify',
+                            body: aboutText,
+                          ),
+                        ),
+                        const _LegalDivider(),
+                        _LegalRow(
+                          title: 'FAQ',
+                          onTap: () => _openLegalPage(
+                            context,
+                            title: 'FAQ',
+                            body: faqText,
+                          ),
+                        ),
+                        const _LegalDivider(),
+                        _LegalRow(
+                          title: 'Privacy Policy',
+                          onTap: () => _openLegalPage(
+                            context,
+                            title: 'Privacy Policy',
+                            body: legalPrivacyText,
+                            effectiveDate: legalEffectiveDate,
+                          ),
+                        ),
+                        const _LegalDivider(),
+                        _LegalRow(
+                          title: 'Terms of Service',
+                          onTap: () => _openLegalPage(
+                            context,
+                            title: 'Terms of Service',
+                            body: legalTermsText,
+                            effectiveDate: legalEffectiveDate,
+                          ),
+                        ),
+                        const _LegalDivider(),
+                        _LegalRow(
+                          title: 'Contact',
+                          trailing: Text(
+                            _contactEmail,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                          onTap: () => _copyContactEmail(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+
+            // Blur header — scroll par fade-in hota hai (iOS jaisa):
+            // frosted patti me "Settings" center me.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                ignoring: !_showBar,
+                child: AnimatedOpacity(
+                  opacity: _showBar ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: scheme.surface.withValues(alpha: 0.72),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: scheme.outline.withValues(alpha: 0.2),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Settings',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-
-              // ================= CONNECTION =================
-              _GroupCard(
-                child: Column(
-                  children: [
-                    _SettingsRow(
-                      icon: Icons.wifi_outlined,
-                      title: 'Connection',
-                      onTap: () => showConnectSheet(context),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.radar_outlined,
-                      title: 'Nearby servers',
-                      onTap: () => _openServersSheet(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ================= MOUSE =================
-              // Three-dot wali mouse sheet ki settings yahan bhi hain.
-              _GroupCard(
-                child: Column(
-                  children: [
-                    _SettingsRow(
-                      icon: Icons.speed_outlined,
-                      title: 'Pointer sensitivity',
-                      onTap: () => _openSliderSheet(
-                        context,
-                        title: 'Pointer sensitivity',
-                        min: 0.5,
-                        max: 3.0,
-                        getValue: (s) => s.sensitivity,
-                        setValue: (s, v) => s.setSensitivity(v),
-                      ),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.swap_vert_outlined,
-                      title: 'Scroll speed',
-                      onTap: () => _openSliderSheet(
-                        context,
-                        title: 'Scroll speed',
-                        min: 0.5,
-                        max: 3.0,
-                        getValue: (s) => s.scrollSpeed,
-                        setValue: (s, v) => s.setScrollSpeed(v),
-                      ),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.mouse_outlined,
-                      title: 'Wheel sensitivity',
-                      onTap: () => _openSliderSheet(
-                        context,
-                        title: 'Wheel sensitivity',
-                        min: 0.5,
-                        max: 3.0,
-                        getValue: (s) => s.wheelSensitivity,
-                        setValue: (s, v) => s.setWheelSensitivity(v),
-                      ),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.bolt_outlined,
-                      title: 'Double-tap speed',
-                      onTap: () => _openSliderSheet(
-                        context,
-                        title: 'Double-tap speed',
-                        min: 200,
-                        max: 500,
-                        getValue: (s) => s.doubleTapSpeed,
-                        setValue: (s, v) => s.setDoubleTapSpeed(v),
-                        formatValue: (v) => '${v.round()} ms',
-                      ),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.swap_vertical_circle_outlined,
-                      title: 'Natural scrolling',
-                      onTap: () => _openNaturalScrollSheet(context),
-                    ),
-                    const _RowDivider(),
-                    _SettingsRow(
-                      icon: Icons.screen_rotation_rounded,
-                      title: 'Motion Control',
-                      onTap: () => _openMotionSheet(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ================= APPEARANCE =================
-              _GroupCard(
-                child: _SettingsRow(
-                  icon: Icons.dark_mode_outlined,
-                  title: 'Appearance',
-                  onTap: () => _openAppearanceSheet(context),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ================= ABOUT & LEGAL =================
-              // Ek hi card me: About, FAQ, Contact, Privacy Policy,
-              // Terms of Service (screenshot wale card jaisa).
-              _GroupCard(
-                child: Column(
-                  children: [
-                    _LegalRow(
-                      title: 'About',
-                      onTap: () => _openLegalPage(
-                        context,
-                        title: 'About Mousify',
-                        body: aboutText,
-                      ),
-                    ),
-                    const _LegalDivider(),
-                    _LegalRow(
-                      title: 'FAQ',
-                      onTap: () => _openLegalPage(
-                        context,
-                        title: 'FAQ',
-                        body: faqText,
-                      ),
-                    ),
-                    const _LegalDivider(),
-                    _LegalRow(
-                      title: 'Contact',
-                      trailing: Text(
-                        _contactEmail,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                        ),
-                      ),
-                      onTap: () => _copyContactEmail(context),
-                    ),
-                    const _LegalDivider(),
-                    _LegalRow(
-                      title: 'Privacy Policy',
-                      onTap: () => _openLegalPage(
-                        context,
-                        title: 'Privacy Policy',
-                        body: legalPrivacyText,
-                        effectiveDate: legalEffectiveDate,
-                      ),
-                    ),
-                    const _LegalDivider(),
-                    _LegalRow(
-                      title: 'Terms of Service',
-                      onTap: () => _openLegalPage(
-                        context,
-                        title: 'Terms of Service',
-                        body: legalTermsText,
-                        effectiveDate: legalEffectiveDate,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+/// Profile row — tap par ProfilePage (signed in) ya AuthPage (guest).
+void _openProfile(BuildContext context) {
+  final user = context.read<AuthService>().currentUser;
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => user != null ? const ProfilePage() : const AuthPage(),
+    ),
+  );
 }
 
 /// Bada gol card — dark mode me gray (#262628), flat matte.
@@ -250,16 +430,146 @@ class _GroupCard extends StatelessWidget {
   }
 }
 
-/// Rows ke beech wali divider — icon ke baad se shuru.
+/// Rows ke beech wali divider — icon ke baad se shuru (default 58).
+/// Profile row ke baad avatar ke baad se (82).
 class _RowDivider extends StatelessWidget {
-  const _RowDivider();
+  final double indent;
+
+  const _RowDivider({this.indent = 58});
 
   @override
   Widget build(BuildContext context) {
     return Divider(
       height: 1,
-      indent: 58,
+      indent: indent,
       color: Theme.of(context).colorScheme.outline,
+    );
+  }
+}
+
+/// Profile box ki pehli row — simple profile icon + naam + email +
+/// chevron. Avatar ki jagah seedha person icon hai (koi gol background
+/// nahi) — baaki rows jaisa. Signed in: naam/email (AuthService).
+/// Guest: simple "Profile" (koi "Guest" / "Sign in with Google" nahi).
+/// Tap → ProfilePage / AuthPage.
+class _ProfileRow extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ProfileRow({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final user = context.watch<AuthService>().currentUser;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Haptics.click();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                Icons.person_outline_rounded,
+                size: 24,
+                color: scheme.onSurface,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.name ?? 'Profile',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (user != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        user.email,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 24,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Toggle wali row — icon + title + seedha Switch (koi chevron,
+/// koi sheet nahi). Title par tap bhi toggle karta hai.
+class _ToggleRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Key? switchKey;
+
+  const _ToggleRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.switchKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 24, color: scheme.onSurface),
+          const SizedBox(width: 16),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                Haptics.click();
+                onChanged(!value);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Switch(
+            key: switchKey,
+            value: value,
+            onChanged: (v) {
+              Haptics.click();
+              onChanged(v);
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -286,7 +596,7 @@ class _SettingsRow extends StatelessWidget {
         onTap: onTap == null
             ? null
             : () {
-                HapticFeedback.selectionClick();
+                Haptics.click();
                 onTap!();
               },
         child: Padding(
@@ -339,7 +649,7 @@ class _LegalRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          Haptics.click();
           onTap();
         },
         child: Padding(
@@ -405,7 +715,7 @@ void _openLegalPage(
 
 /// Contact email copy karo + batado.
 void _copyContactEmail(BuildContext context) {
-  HapticFeedback.selectionClick();
+  Haptics.click();
   // Clipboard ka wait nahi karte — copy fire-and-forget hai, snackbar
   // turant dikhao. (Test env me Clipboard.setData ka Future kabhi
   // complete nahi hota, is liye await karna hang karta hai.)
@@ -478,12 +788,45 @@ class _SettingsSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  // Gol X close button — home sheets jaisa.
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.raised(isDark),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          Haptics.click();
+                          Navigator.of(context).pop();
+                        },
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: AppColors.ink(isDark),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Flexible(
@@ -569,185 +912,116 @@ class _SliderSheetContent extends StatelessWidget {
   }
 }
 
-/// Natural scrolling ki sheet — switch ke saath.
-void _openNaturalScrollSheet(BuildContext context) {
-  _openSheet(
-    context,
-    title: 'Natural scrolling',
-    child: const _NaturalScrollSheetContent(),
-  );
-}
-
-class _NaturalScrollSheetContent extends StatelessWidget {
-  const _NaturalScrollSheetContent();
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = context.watch<AppSettings>();
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Natural scrolling',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Scroll direction ulat kar dein',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Switch(
-          value: settings.naturalScroll,
-          onChanged: settings.setNaturalScroll,
-        ),
-      ],
-    );
-  }
-}
-
-/// Motion Control ki sheet — switch + on ho to Motion speed slider.
-void _openMotionSheet(BuildContext context) {
-  _openSheet(
-    context,
-    title: 'Motion Control',
-    child: const _MotionSheetContent(),
-  );
-}
-
-class _MotionSheetContent extends StatelessWidget {
-  const _MotionSheetContent();
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = context.watch<AppSettings>();
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Motion Control',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Phone tilt karke cursor chalao',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: settings.motionControl,
-              onChanged: settings.setMotionControl,
-            ),
-          ],
-        ),
-        if (settings.motionControl) ...[
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Motion speed',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                ),
-              ),
-              Text(
-                settings.motionSensitivity.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SpeedSlider(
-            min: 0.5,
-            max: 2.0,
-            value: settings.motionSensitivity,
-            onChanged: settings.setMotionSensitivity,
-            sliderKey: const Key('settings-motion-speed-slider'),
-            tooltipKey: const Key('settings-motion-speed-tooltip'),
-            trackKey: const Key('settings-motion-speed-slider-track'),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ],
-    );
-  }
-}
-
-/// Appearance ki sheet — Dark / Light options, check ke saath.
+/// Appearance ki sheet — Composer ke typing page ke actions sheet
+/// jaisi: koi title ya X nahi, sirf drag handle + EK raised gol
+/// card me Light / Dark / System (icon + label, selected par check).
+/// Tap par select + sheet band.
 void _openAppearanceSheet(BuildContext context) {
-  _openSheet(
-    context,
-    title: 'Appearance',
-    child: const _AppearanceSheetContent(),
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const _AppearanceSheet(),
   );
 }
 
-class _AppearanceSheetContent extends StatelessWidget {
-  const _AppearanceSheetContent();
+class _AppearanceSheet extends StatelessWidget {
+  const _AppearanceSheet();
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _OptionRow(
-          icon: Icons.dark_mode_outlined,
-          label: 'Dark',
-          selected: settings.isDark,
-          onTap: () {
-            settings.setDark(true);
-            Navigator.of(context).pop();
-          },
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = AppColors.ink(isDark);
+    return Material(
+      color: AppColors.chip(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ink.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.raised(isDark),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _AppearanceOptionRow(
+                        icon: Icons.light_mode_outlined,
+                        label: 'Light',
+                        selected: settings.themeMode == ThemeMode.light,
+                        onTap: () {
+                          settings.setThemeMode(ThemeMode.light);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      _sheetDivider(ink),
+                      _AppearanceOptionRow(
+                        icon: Icons.dark_mode_outlined,
+                        label: 'Dark',
+                        selected: settings.themeMode == ThemeMode.dark,
+                        onTap: () {
+                          settings.setThemeMode(ThemeMode.dark);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      _sheetDivider(ink),
+                      _AppearanceOptionRow(
+                        icon: Icons.brightness_auto_outlined,
+                        label: 'System',
+                        selected: settings.themeMode == ThemeMode.system,
+                        onTap: () {
+                          settings.setThemeMode(ThemeMode.system);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        _OptionRow(
-          icon: Icons.light_mode_outlined,
-          label: 'Light',
-          selected: !settings.isDark,
-          onTap: () {
-            settings.setDark(false);
-            Navigator.of(context).pop();
-          },
-        ),
-      ],
+      ),
     );
   }
+
+  Widget _sheetDivider(Color ink) => Container(
+        height: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        color: ink.withValues(alpha: 0.08),
+      );
 }
 
-class _OptionRow extends StatelessWidget {
+/// Appearance sheet ki ek row — icon + label + selected par check.
+class _AppearanceOptionRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _OptionRow({
+  const _AppearanceOptionRow({
     required this.icon,
     required this.label,
     required this.selected,
@@ -761,12 +1035,12 @@ class _OptionRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          Haptics.click();
           onTap();
         },
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
           child: Row(
             children: [
               Icon(icon, size: 24, color: scheme.onSurface),
@@ -827,66 +1101,127 @@ class _ServersSheetState extends State<_ServersSheet> {
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
     final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return ListenableBuilder(
       listenable: _discovery,
       builder: (context, _) {
         if (_discovery.servers.isEmpty) {
+          // Khubsurat empty state — radar icon + text + Scan button.
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (_discovery.scanning)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Icon(
-                    Icons.wifi_find_outlined,
-                    size: 22,
-                    color: scheme.onSurfaceVariant,
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.raised(isDark),
                   ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _discovery.scanning
-                        ? 'Searching for nearby PCs…'
-                        : 'Koi nearby server nahi mila',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  child: _discovery.scanning
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : Icon(
+                          Icons.radar_outlined,
+                          size: 30,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _discovery.scanning
+                      ? 'Searching for nearby PCs…'
+                      : 'Koi nearby server nahi mila',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (!_discovery.scanning)
-                  TextButton(
-                    onPressed: _discovery.start,
-                    child: const Text('Scan again'),
+                const SizedBox(height: 4),
+                Text(
+                  _discovery.scanning
+                      ? 'Aas paas ke PCs dhoond rahe hain'
+                      : 'Phone aur PC ek hi Wi-Fi par hon',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant,
                   ),
+                ),
+                if (!_discovery.scanning) ...[
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Haptics.click();
+                      _discovery.start();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Scan again'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           );
         }
+        // Servers mil gaye — ek raised gol card me rows.
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ..._discovery.servers.map((s) {
-              final isActive = settings.host == s.address &&
-                  settings.port == s.port;
-              return _ServerRow(
-                server: s,
-                isActive: isActive,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _connectToServer(widget.parentContext, s);
-                },
-              );
-            }),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.raised(isDark),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < _discovery.servers.length; i++) ...[
+                      if (i > 0)
+                        Container(
+                          height: 1,
+                          margin:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          color: AppColors.ink(isDark)
+                              .withValues(alpha: 0.08),
+                        ),
+                      _ServerRow(
+                        server: _discovery.servers[i],
+                        isActive: settings.host ==
+                                _discovery.servers[i].address &&
+                            settings.port == _discovery.servers[i].port,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _connectToServer(
+                            widget.parentContext,
+                            _discovery.servers[i],
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: _discovery.start,
+                onPressed: () {
+                  Haptics.click();
+                  _discovery.start();
+                },
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Scan again'),
               ),
@@ -916,12 +1251,13 @@ class _ServerRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          Haptics.click();
           onTap();
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Row(
             children: [
               Icon(

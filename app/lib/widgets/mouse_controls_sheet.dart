@@ -1,7 +1,7 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/settings_store.dart';
@@ -18,7 +18,7 @@ import '../theme.dart';
 ///   speed ka slider bhi aa jata hai.
 /// Wheel / double-tap Settings tab me rehte hain.
 Future<void> showMouseControlsSheet(BuildContext context) {
-  HapticFeedback.selectionClick();
+  Haptics.click();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -215,7 +215,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                               ink.withValues(alpha: 0.2),
                           onChanged: (v) {
                             settings.setNaturalScroll(v);
-                            HapticFeedback.selectionClick();
+                            Haptics.click();
                           },
                         ),
                       ),
@@ -238,7 +238,7 @@ class _MouseSettingsSheet extends StatelessWidget {
                               ink.withValues(alpha: 0.2),
                           onChanged: (v) {
                             settings.setMotionControl(v);
-                            HapticFeedback.selectionClick();
+                            Haptics.click();
                           },
                         ),
                       ),
@@ -426,7 +426,7 @@ class SpeedSliderState extends State<SpeedSlider>
     if (snapped != _lastApplied) {
       _lastApplied = snapped;
       widget.onChanged(snapped);
-      HapticFeedback.selectionClick();
+      Haptics.click();
     }
     setState(() {});
   }

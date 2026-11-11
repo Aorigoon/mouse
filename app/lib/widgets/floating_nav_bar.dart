@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../utils/haptics.dart';
 
 import '../theme.dart';
 import 'apps_grid_icon.dart';
@@ -85,7 +85,7 @@ class FloatingNavBar extends StatelessWidget {
               item: _items[i],
               selected: i == currentIndex,
               onTap: () {
-                HapticFeedback.selectionClick();
+                Haptics.click();
                 onTap(i);
               },
             ),

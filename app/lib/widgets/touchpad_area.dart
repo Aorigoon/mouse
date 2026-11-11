@@ -1,7 +1,7 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -73,7 +73,7 @@ class _TouchpadAreaState extends State<TouchpadArea> {
       if (_pointer == null || _moved || _scrollMode) return;
       setState(() => _scrollMode = true);
       _scrolling.value = true;
-      HapticFeedback.mediumImpact();
+      Haptics.impact();
     });
   }
 
@@ -141,13 +141,13 @@ class _TouchpadAreaState extends State<TouchpadArea> {
       _pendingClick?.cancel();
       _pendingClick = null;
       _lastTapTime = null;
-      HapticFeedback.mediumImpact();
+      Haptics.impact();
       _openComposer();
     } else {
       _lastTapTime = now;
       _pendingClick?.cancel();
       _pendingClick = Timer(const Duration(milliseconds: _tapWindowMs), () {
-        HapticFeedback.selectionClick();
+        Haptics.click();
         _conn().button('left', 'click');
         _lastTapTime = null;
       });
@@ -184,7 +184,7 @@ class _TouchpadAreaState extends State<TouchpadArea> {
   }
 
   void _rightClick() {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     _conn().button('right', 'click');
   }
 

@@ -5,6 +5,7 @@ import 'package:mousify/main.dart';
 import 'package:mousify/theme.dart';
 import 'package:mousify/views/auth_page.dart';
 import 'package:mousify/views/legal_page.dart';
+import 'package:mousify/views/profile_page.dart';
 import 'package:mousify/views/settings_view.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,6 +43,13 @@ void main() {
     await goToSettings(tester);
 
     expect(find.text('Settings'), findsWidgets);
+    // Profile box — guest: simple "Profile" (koi "Guest" /
+    // "Sign in with Google" nahi), Appearance, Haptic feedback toggle.
+    // 'Profile' do dafa hai — section label + guest row.
+    expect(find.text('Profile'), findsWidgets);
+    expect(find.text('Guest'), findsNothing);
+    expect(find.text('Sign in with Google'), findsNothing);
+    expect(find.text('Haptic feedback'), findsOneWidget);
     expect(find.text('Connection'), findsOneWidget);
     expect(find.text('Nearby servers'), findsOneWidget);
     expect(find.text('Pointer sensitivity'), findsOneWidget);
@@ -65,8 +73,7 @@ void main() {
 
   testWidgets('settings page - logged in', (tester) async {
     // Pehle se bana hua account — naam/email SharedPreferences me.
-    // Profile card hata diya hai, is liye page logged out jaisa hi
-    // dikhta hai — ye test sirf render check hai.
+    // Profile box me naam + email dikhte hain.
     SharedPreferences.setMockInitialValues({
       'auth_name': 'Zain Ul Abidin',
       'auth_email': 'zain@example.com',
@@ -76,10 +83,33 @@ void main() {
     await goToSettings(tester);
 
     expect(find.text('Settings'), findsWidgets);
+    expect(find.text('Zain Ul Abidin'), findsOneWidget);
+    expect(find.text('zain@example.com'), findsOneWidget);
+    expect(find.text('Guest'), findsNothing);
 
     await expectLater(
       find.byType(MousifyApp),
       matchesGoldenFile('goldens/settings_logged_in.png'),
+    );
+  });
+
+  testWidgets('settings page - scrolled, blur header golden',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    // Neeche scroll karo — bara title upar jaye, blur bar me
+    // "Settings" center me aa jaye. pumpAndSettle zaroori hai —
+    // bar ki 200ms fade animation poori ho, warna golden me bar
+    // nazar nahi aata (single pump par animation abhi shuru hoti hai).
+    await tester.drag(find.byType(SettingsView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/settings_scrolled.png'),
     );
   });
 
@@ -132,8 +162,8 @@ void main() {
     await pumpApp(tester);
     await goToSettings(tester);
 
-    // Neeche scroll karo — legal card (About, FAQ, Contact,
-    // Privacy Policy, Terms of Service) dikhe.
+    // Neeche scroll karo — legal card (About, FAQ, Privacy Policy,
+    // Terms of Service, Contact — Contact aakhir me) dikhe.
     // scrollUntilVisible nahi — PageView bhi Scrollable hai, is liye
     // wo "Too many elements" deta hai; ensureVisible nearest
     // Scrollable (Settings page) ko scroll karta hai.
@@ -270,56 +300,229 @@ void main() {
 
     await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
-    // Sheet me Dark/Light options hain (row par koi subtitle nahi).
-    expect(find.text('Dark'), findsOneWidget);
+    // Composer sheet jaisi — koi title nahi, ek card me 3 options.
     expect(find.text('Light'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
 
-    // Dark select karo — sheet band ho jaye, row par kuch nahi badle.
+    // Dark select karo — sheet band ho jaye, theme dark ho jaye.
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(find.text('Dark'), findsNothing);
     expect(find.text('Light'), findsNothing);
+    expect(find.text('System'), findsNothing);
     expect(find.text('Appearance'), findsOneWidget);
+    final brightness =
+        Theme.of(tester.element(find.byType(SettingsView))).brightness;
+    expect(brightness, Brightness.dark);
   });
 
-  testWidgets('settings row - Natural scrolling sheet me switch toggle',
-      (tester) async {
+  testWidgets('settings sheet - Appearance sheet golden', (tester) async {
     SharedPreferences.setMockInitialValues({});
     mockSensorsForTest();
     await pumpApp(tester);
     await goToSettings(tester);
 
-    await tester.tap(find.text('Natural scrolling'));
+    await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
-    expect(find.byType(Switch), findsOneWidget);
-    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(find.text('System'), findsOneWidget);
 
-    await tester.tap(find.byType(Switch));
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/appearance_sheet.png'),
+    );
+  });
+
+  testWidgets('settings row - Natural scrolling row toggle', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    // Sheet nahi khulti — row par seedha toggle hai. Page par do
+    // Switch hain (Haptic + Natural), is liye row se scope karo.
+    final naturalSwitch = find.descendant(
+      of: find.ancestor(
+        of: find.text('Natural scrolling'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(Switch),
+    );
+    expect(naturalSwitch, findsOneWidget);
+    expect(tester.widget<Switch>(naturalSwitch).value, isFalse);
+
+    await tester.tap(naturalSwitch);
     await tester.pump();
-    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    expect(tester.widget<Switch>(naturalSwitch).value, isTrue);
   });
 
-  testWidgets('settings row - Motion Control sheet me switch + speed slider',
+  testWidgets('settings row - Haptic feedback row toggle', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    final hapticSwitch = find.descendant(
+      of: find.ancestor(
+        of: find.text('Haptic feedback'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(Switch),
+    );
+    expect(hapticSwitch, findsOneWidget);
+    expect(tester.widget<Switch>(hapticSwitch).value, isTrue);
+
+    await tester.tap(hapticSwitch);
+    await tester.pump();
+    expect(tester.widget<Switch>(hapticSwitch).value, isFalse);
+  });
+
+  testWidgets(
+      'settings row - Motion Control toggle on karne par speed slider card me dikhta hai',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     mockSensorsForTest();
     await pumpApp(tester);
     await goToSettings(tester);
 
-    await tester.tap(find.text('Motion Control'));
-    await tester.pumpAndSettle();
-    expect(find.byType(Switch), findsOneWidget);
-    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    // Shuru me Motion Control off — speed slider nahi dikhta.
     expect(find.text('Motion speed'), findsNothing);
+    // Motion Control row par koi chevron/arrow nahi hai.
+    final rowChevron = find.descendant(
+      of: find.ancestor(
+        of: find.text('Motion Control'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byIcon(Icons.chevron_right_rounded),
+    );
+    expect(rowChevron, findsNothing);
 
-    await tester.tap(find.byType(Switch));
+    final rowSwitch = find.byKey(const Key('motion-control-switch'));
+    expect(rowSwitch, findsOneWidget);
+    expect(tester.widget<Switch>(rowSwitch).value, isFalse);
+
+    await tester.tap(rowSwitch);
     await tester.pumpAndSettle();
-    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    expect(tester.widget<Switch>(rowSwitch).value, isTrue);
+    // Speed slider ab card ke andar hi dikhta hai — koi sheet nahi.
     expect(find.text('Motion speed'), findsOneWidget);
     expect(
       find.byKey(const Key('settings-motion-speed-slider-track')),
       findsOneWidget,
     );
+
+    await tester.tap(rowSwitch);
+    await tester.pump();
+    expect(tester.widget<Switch>(rowSwitch).value, isFalse);
+    expect(find.text('Motion speed'), findsNothing);
+  });
+
+  testWidgets('settings row - Profile tap se ProfilePage khulti hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'auth_name': 'Zain Ul Abidin',
+      'auth_email': 'zain@example.com',
+    });
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.tap(find.text('Zain Ul Abidin'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfilePage), findsOneWidget);
+    expect(find.text('zain@example.com'), findsWidgets);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Delete account'), findsOneWidget);
+    // v3 — simple: EK box me Nickname + Email + Sign out, Delete neeche.
+    // Koi "Save changes" nahi, Birthday/Phone/Home/Work/Family nahi.
+    expect(find.text('Save changes'), findsNothing);
+    expect(find.text('Nickname'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Birthday'), findsNothing);
+    expect(find.text('Phone'), findsNothing);
+    expect(find.text('Home'), findsNothing);
+    expect(find.text('Work'), findsNothing);
+    expect(find.text('Family'), findsNothing);
+    // Arrows: page par ab koi chevron nahi — Nickname, Sign out
+    // aur Delete account teeno ke baghair.
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+    // Sign out center me hai (page 390 chauda, center 195).
+    final signOutBox =
+        find.text('Sign out').evaluate().first.renderObject as RenderBox;
+    final signOutCenter =
+        signOutBox.localToGlobal(signOutBox.size.center(Offset.zero));
+    expect((signOutCenter.dx - 195).abs(), lessThan(2));
+    // Delete account partition horizontally chhota hai, text center me.
+    final deleteTextBox =
+        find.text('Delete account').evaluate().first.renderObject as RenderBox;
+    final deleteCenter =
+        deleteTextBox.localToGlobal(deleteTextBox.size.center(Offset.zero));
+    expect((deleteCenter.dx - 195).abs(), lessThan(2));
+    final deleteCardBox = find
+        .ancestor(
+          of: find.text('Delete account'),
+          matching: find.byWidgetPredicate(
+            (w) => w is Material && w.shape is RoundedRectangleBorder,
+          ),
+        )
+        .evaluate()
+        .first
+        .renderObject as RenderBox;
+    expect(deleteCardBox.size.width, lessThan(300));
+    final signOutCardBox = find
+        .ancestor(
+          of: find.text('Sign out'),
+          matching: find.byWidgetPredicate(
+            (w) => w is Material && w.shape is RoundedRectangleBorder,
+          ),
+        )
+        .evaluate()
+        .first
+        .renderObject as RenderBox;
+    expect(signOutCardBox.size.width, greaterThan(300));
+
+    await expectLater(
+      find.byType(ProfilePage),
+      matchesGoldenFile('goldens/profile_page.png'),
+    );
+  });
+
+  testWidgets('profile page - Nickname edit sheet se save hota hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'auth_name': 'Zain Ul Abidin',
+      'auth_email': 'zain@example.com',
+    });
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.tap(find.text('Zain Ul Abidin'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nickname'));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('profile-edit-field-0'));
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'Zainu');
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    // Sheet band, row me naya nickname dikhe.
+    expect(find.text('Zainu'), findsOneWidget);
+    expect(find.text('What should we call you?'), findsNothing);
+  });
+
+  testWidgets('settings row - Guest tap se AuthPage khulti hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.tap(find.byIcon(Icons.person_outline_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(AuthPage), findsOneWidget);
+    expect(find.text('Your Phone Is the Mouse Now.'), findsOneWidget);
   });
 
   testWidgets('settings legal card - Terms page khulti hai', (tester) async {

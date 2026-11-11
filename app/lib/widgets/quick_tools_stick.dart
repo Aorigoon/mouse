@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../utils/haptics.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -33,12 +33,12 @@ class _QuickToolsStickState extends State<QuickToolsStick> {
   bool _expanded = false;
 
   void _toggle() {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     setState(() => _expanded = !_expanded);
   }
 
   void _tool(String key, {bool ctrl = false}) {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     context.read<MousifyConnection>().send({
       't': 'key',
       'k': key,

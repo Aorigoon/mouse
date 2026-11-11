@@ -473,11 +473,16 @@ void main() {
     expect(find.text('Search apps'), findsOneWidget);
     // Keyboard khula ho to bottom nav chhupa hota hai (neeche slide
     // hokar) — search bar seedha keyboard ke upar hota hai: bar ka
-    // neeche wala kinara keyboard ke top (844-300=544) se sirf ~16px
-    // upar hona chahiye. Pehle ye ~120px upar hota tha (nav beech
-    // me aa jata tha).
+    // neeche wala kinara keyboard ke top (844-150=694, fake keyboard
+    // 300 physical = 150 logical) se sirf ~16px upar hona chahiye.
+    // Bar ki position focus se chalti hai (viewInsets yahan hamesha 0
+    // hota hai — outer Scaffold inset hata deta hai).
+    final positioned = tester.widget<AnimatedPositioned>(
+      find.byType(AnimatedPositioned).first,
+    );
+    expect(positioned.bottom, 16);
     final barBottom = tester.getBottomLeft(find.byType(TextField)).dy;
-    expect(barBottom, greaterThan(500));
+    expect(barBottom, greaterThan(640));
 
     await expectLater(
       find.byType(MousifyApp),

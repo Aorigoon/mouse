@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -102,7 +103,7 @@ class _ComposerPageState extends State<ComposerPage> {
 
   /// Mic chip par tap — sunna shuru ya band karo.
   Future<void> _toggleListening() async {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     if (_isListening) {
       await _speech.stop();
       _stopListeningState();
@@ -237,7 +238,7 @@ class _ComposerPageState extends State<ComposerPage> {
       _showSnack('Connect to your PC in Settings first');
       return;
     }
-    HapticFeedback.selectionClick();
+    Haptics.click();
     conn.send({'t': 'key', 'k': 'enter'});
     // Keyboard khula rahe — field par focus wapas lao.
     _focus.requestFocus();
@@ -245,7 +246,7 @@ class _ComposerPageState extends State<ComposerPage> {
 
   void _showActionsSheet() {
     final hasText = _controller.text.isNotEmpty;
-    HapticFeedback.selectionClick();
+    Haptics.click();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -294,7 +295,7 @@ class _ComposerPageState extends State<ComposerPage> {
                       // Back button — left side wali chip (shared BackChip).
                       BackChip(
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          Haptics.click();
                           Navigator.of(context).pop();
                         },
                       ),

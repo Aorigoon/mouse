@@ -20,7 +20,13 @@ class AppSettings extends ChangeNotifier {
   double doubleTapSpeed = 350; // ms window
   bool naturalScroll = false;
   bool swapButtons = false;
-  bool isDark = false; // light default
+  // Theme — teen mode: light / dark / system (phone ki setting).
+  ThemeMode themeMode = ThemeMode.light; // light default
+  // Haptic feedback — Settings → Haptic feedback toggle (default ON).
+  // `hapticsEnabled` static mirror hai taaki `Haptics` helper bina
+  // BuildContext ke bhi check kar sake (37 call sites).
+  bool hapticFeedback = true;
+  static bool hapticsEnabled = true;
   // Motion Control — phone tilt se cursor move (default off).
   bool motionControl = false;
   double motionSensitivity = 1.0;
@@ -46,7 +52,20 @@ class AppSettings extends ChangeNotifier {
     swapButtons = _prefs.getBool('swap_buttons') ?? false;
     motionControl = _prefs.getBool('motion_control') ?? false;
     motionSensitivity = _prefs.getDouble('motion_sensitivity') ?? 1.0;
-    isDark = _prefs.getBool('is_dark') ?? false; // light default
+    // Theme mode — purani `is_dark` bool se migrate (dark→dark,
+    // light→light); default Light (jaisa pehle tha).
+    final storedTheme = _prefs.getString('theme_mode');
+    if (storedTheme != null) {
+      themeMode = ThemeMode.values.firstWhere(
+        (m) => m.name == storedTheme,
+        orElse: () => ThemeMode.light,
+      );
+    } else {
+      themeMode =
+          (_prefs.getBool('is_dark') ?? false) ? ThemeMode.dark : ThemeMode.light;
+    }
+    hapticFeedback = _prefs.getBool('haptic_feedback') ?? true;
+    hapticsEnabled = hapticFeedback;
     history = _prefs.getStringList('history') ?? [];
     pinnedApps = _prefs.getStringList('pinned_apps') ?? [];
     appsCacheJson = _prefs.getString('apps_cache');
@@ -133,9 +152,16 @@ class AppSettings extends ChangeNotifier {
     _prefs.setString('apps_cache', json);
   }
 
-  void setDark(bool v) {
-    isDark = v;
-    _prefs.setBool('is_dark', v);
+  void setThemeMode(ThemeMode m) {
+    themeMode = m;
+    _prefs.setString('theme_mode', m.name);
+    notifyListeners();
+  }
+
+  void setHapticFeedback(bool v) {
+    hapticFeedback = v;
+    hapticsEnabled = v;
+    _prefs.setBool('haptic_feedback', v);
     notifyListeners();
   }
 

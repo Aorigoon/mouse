@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../utils/haptics.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -21,7 +21,7 @@ import '../views/qr_scan_page.dart';
 /// Connect / Disconnect button. Pair-with-code hata diya hai —
 /// pairing ab sirf QR scan se hoti hai (QR me token hota hai).
 Future<void> showConnectSheet(BuildContext context) {
-  HapticFeedback.selectionClick();
+  Haptics.click();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -81,7 +81,7 @@ class _ConnectSheetState extends State<_ConnectSheet> {
     // Snackbar sheet band hone ke baad bhi dikhe — messenger pehle
     // pakdo (pop ke baad context deactivate ho jata hai).
     final messenger = ScaffoldMessenger.of(context);
-    HapticFeedback.selectionClick();
+    Haptics.click();
     settings.setHost(host, port);
     conn.connect(host, port, token: settings.token);
     Navigator.of(context).pop();
@@ -111,7 +111,7 @@ class _ConnectSheetState extends State<_ConnectSheet> {
   }
 
   void _disconnect() {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     context.read<MousifyConnection>().disconnect();
     Navigator.of(context).pop();
   }

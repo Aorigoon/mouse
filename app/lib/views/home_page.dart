@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -178,7 +179,7 @@ class _GuideChipState extends State<_GuideChip> {
   }
 
   void _toggle() {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     if (_expanded) {
       // Band: pehle content fade + scale-out (300ms), phir box
       // shrink (200ms baad — content tab tak taqreeban gayab).

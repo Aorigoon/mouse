@@ -1,8 +1,8 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -133,7 +133,7 @@ class _DockPageState extends State<DockPage> {
       );
       return;
     }
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     late final StreamSubscription sub;
     sub = _conn.events.listen((msg) {
       if (msg['t'] == 'launched') {
@@ -199,15 +199,22 @@ class _DockPageState extends State<DockPage> {
             ],
           ),
           // Floating search bar — keyboard band ho to floating nav
-          // ke upar (bottom 112); keyboard khule to nav chhup jata
-          // hai, is liye bar seedha keyboard ke upar aa jata hai
-          // (bottom 16 — wahan jahan pehle nav hota tha).
+          // ke upar (bottom 112); search field focused ho (keyboard
+          // khula) to seedha keyboard ke upar (bottom 16).
+          //
+          // NOTE: MediaQuery viewInsets.bottom yahan hamesha 0 hota
+          // hai — HomeShell ka outer Scaffold apni body ke MediaQuery
+          // se bottom inset hata deta hai (removeBottomInset), is liye
+          // keyboard ka pata us se nahi chalta aur bar 112 par atka
+          // rehta tha (keyboard se ~112px upar — Zain ki shikayat).
+          // Focus hi sahi signal hai: Apps page par sirf yehi field
+          // hai, focused = keyboard khula.
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
             left: 16,
             right: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 112,
+            bottom: _isSearchFocused ? 16 : 112,
             child: _BeautifulSearchBar(
               controller: _queryController,
               focusNode: _focusNode,

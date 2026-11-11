@@ -1,8 +1,8 @@
 import 'dart:async';
+import '../utils/haptics.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
@@ -73,7 +73,7 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   void _media(String action) {
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     _conn.send({'t': 'media', 'action': action});
   }
 
@@ -90,7 +90,7 @@ class _ToolsPageState extends State<ToolsPage> {
       );
       return;
     }
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('PC par "Capture" dialog confirm karo…'),
@@ -101,7 +101,7 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   void _editKey(String k, {bool ctrl = false}) {
-    HapticFeedback.selectionClick();
+    Haptics.click();
     _conn.send({'t': 'key', 'k': k, 'ctrl': ctrl});
   }
 
@@ -311,7 +311,7 @@ class _ToolsPageState extends State<ToolsPage> {
                       app: w.app,
                       title: w.title,
                       onTap: () {
-                        HapticFeedback.selectionClick();
+                        Haptics.click();
                         windowsService.focus(w);
                       },
                     ),
@@ -405,7 +405,7 @@ class _MediaBtnState extends State<_MediaBtn> {
       onTapCancel: () => setState(() => _down = false),
       onTapUp: (_) {
         setState(() => _down = false);
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
         widget.onTap();
       },
       child: AnimatedScale(
@@ -471,7 +471,7 @@ class _EditPill extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () {
-        HapticFeedback.selectionClick();
+        Haptics.click();
         onTap();
       },
       child: Container(
@@ -515,7 +515,7 @@ class _BigAction extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: () {
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
         onTap();
       },
       child: Container(
