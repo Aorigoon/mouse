@@ -213,6 +213,16 @@ class _SettingsViewState extends State<SettingsView> {
                           ),
                         ),
                         const _RowDivider(),
+                        // Shake — baghair toggle wali row hai, is liye
+                        // toggle wali rows (Natural scrolling, Motion
+                        // Control) se UPAR hai, baaki chevron rows ke
+                        // saath. Tap par bottom sheet khulti hai.
+                        _SettingsRow(
+                          icon: Icons.phone_android_rounded,
+                          title: 'Shake',
+                          onTap: () => _openShakeSheet(context),
+                        ),
+                        const _RowDivider(),
                         _ToggleRow(
                           icon: Icons.swap_vertical_circle_outlined,
                           title: 'Natural scrolling',
@@ -908,6 +918,144 @@ class _SliderSheetContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+/// Shake ki sheet — Pointer sensitivity wali sheet jaisi (title +
+/// X): Shake master toggle, Mouse pad / Typing toggles, phir har
+/// action ke liye count slider — hamara default SpeedSlider
+/// (scroll speed / wheel sensitivity wala), 1–5 shakes.
+void _openShakeSheet(BuildContext context) {
+  _openSheet(
+    context,
+    title: 'Shake',
+    child: const _ShakeSheetContent(),
+  );
+}
+
+class _ShakeSheetContent extends StatelessWidget {
+  const _ShakeSheetContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ToggleRow(
+          icon: Icons.phone_android_rounded,
+          title: 'Shake',
+          value: settings.shakeEnabled,
+          onChanged: settings.setShakeEnabled,
+          switchKey: const Key('shake-enabled-switch'),
+        ),
+        if (settings.shakeEnabled) ...[
+          const _RowDivider(),
+          _ToggleRow(
+            icon: Icons.touch_app_rounded,
+            title: 'Mouse pad',
+            value: settings.shakeMouseEnabled,
+            onChanged: settings.setShakeMouseEnabled,
+            switchKey: const Key('shake-mouse-switch'),
+          ),
+          // Mouse pad on ho to uska slider seedha uske neeche
+          // (Motion Control wala pattern) — off ho to gayab.
+          if (settings.shakeMouseEnabled) ...[
+            const _RowDivider(),
+            _ShakeCountSlider(
+              label: 'Mouse pad shakes',
+              value: settings.shakeMouseCount,
+              onChanged: settings.setShakeMouseCount,
+              sliderKey: const Key('shake-mouse-count-slider'),
+              tooltipKey: const Key('shake-mouse-count-tooltip'),
+              trackKey: const Key('shake-mouse-count-track'),
+            ),
+          ],
+          const _RowDivider(),
+          _ToggleRow(
+            icon: Icons.keyboard_outlined,
+            title: 'Typing',
+            value: settings.shakeComposerEnabled,
+            onChanged: settings.setShakeComposerEnabled,
+            switchKey: const Key('shake-composer-switch'),
+          ),
+          // Typing on ho to uska slider seedha uske neeche.
+          if (settings.shakeComposerEnabled) ...[
+            const _RowDivider(),
+            _ShakeCountSlider(
+              label: 'Typing shakes',
+              value: settings.shakeComposerCount,
+              onChanged: settings.setShakeComposerCount,
+              sliderKey: const Key('shake-composer-count-slider'),
+              tooltipKey: const Key('shake-composer-count-tooltip'),
+              trackKey: const Key('shake-composer-count-track'),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+/// Shake sheet ka count slider — label + value + hamara default
+/// SpeedSlider (1–5, poora number).
+class _ShakeCountSlider extends StatelessWidget {
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final Key sliderKey;
+  final Key tooltipKey;
+  final Key trackKey;
+
+  const _ShakeCountSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.sliderKey,
+    required this.tooltipKey,
+    required this.trackKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Text(
+                '$value',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SpeedSlider(
+            min: 1,
+            max: 5,
+            value: value.toDouble(),
+            onChanged: (v) => onChanged(v.round()),
+            sliderKey: sliderKey,
+            tooltipKey: tooltipKey,
+            trackKey: trackKey,
+            formatValue: (v) => '${v.round()}',
+          ),
+        ],
+      ),
     );
   }
 }

@@ -30,6 +30,14 @@ class AppSettings extends ChangeNotifier {
   // Motion Control — phone tilt se cursor move (default off).
   bool motionControl = false;
   double motionSensitivity = 1.0;
+  // Shake — phone hilane se mouse/composer khule (default on).
+  // shakeEnabled master hai; mouse/composer ke alag toggles; counts
+  // 1..5, composer ka count hamesha mouse se zyada rehta hai.
+  bool shakeEnabled = true;
+  bool shakeMouseEnabled = true;
+  bool shakeComposerEnabled = true;
+  int shakeMouseCount = 2;
+  int shakeComposerCount = 4;
   List<String> history = [];
   List<String> pinnedApps = [];
   String? appsCacheJson; // "id|name" entries — offline dock ke liye
@@ -52,6 +60,16 @@ class AppSettings extends ChangeNotifier {
     swapButtons = _prefs.getBool('swap_buttons') ?? false;
     motionControl = _prefs.getBool('motion_control') ?? false;
     motionSensitivity = _prefs.getDouble('motion_sensitivity') ?? 1.0;
+    shakeEnabled = _prefs.getBool('shake_enabled') ?? true;
+    shakeMouseEnabled = _prefs.getBool('shake_mouse_enabled') ?? true;
+    shakeComposerEnabled =
+        _prefs.getBool('shake_composer_enabled') ?? true;
+    shakeMouseCount = _prefs.getInt('shake_mouse_count') ?? 2;
+    shakeComposerCount = _prefs.getInt('shake_composer_count') ?? 4;
+    // Purani save me ulta count ho to seedha kar do.
+    if (shakeComposerCount <= shakeMouseCount) {
+      shakeComposerCount = (shakeMouseCount + 1).clamp(2, 5);
+    }
     // Theme mode — purani `is_dark` bool se migrate (dark→dark,
     // light→light); default Light (jaisa pehle tha).
     final storedTheme = _prefs.getString('theme_mode');
@@ -132,6 +150,46 @@ class AppSettings extends ChangeNotifier {
   void setMotionSensitivity(double v) {
     motionSensitivity = v;
     _prefs.setDouble('motion_sensitivity', v);
+    notifyListeners();
+  }
+
+  void setShakeEnabled(bool v) {
+    shakeEnabled = v;
+    _prefs.setBool('shake_enabled', v);
+    notifyListeners();
+  }
+
+  void setShakeMouseEnabled(bool v) {
+    shakeMouseEnabled = v;
+    _prefs.setBool('shake_mouse_enabled', v);
+    notifyListeners();
+  }
+
+  void setShakeComposerEnabled(bool v) {
+    shakeComposerEnabled = v;
+    _prefs.setBool('shake_composer_enabled', v);
+    notifyListeners();
+  }
+
+  void setShakeMouseCount(int v) {
+    shakeMouseCount = v.clamp(1, 5);
+    // Composer ka count hamesha mouse se zyada rakho.
+    if (shakeComposerCount <= shakeMouseCount) {
+      shakeComposerCount = (shakeMouseCount + 1).clamp(2, 5);
+      _prefs.setInt('shake_composer_count', shakeComposerCount);
+    }
+    _prefs.setInt('shake_mouse_count', shakeMouseCount);
+    notifyListeners();
+  }
+
+  void setShakeComposerCount(int v) {
+    shakeComposerCount = v.clamp(1, 5);
+    // Mouse ka count hamesha composer se kam rakho.
+    if (shakeMouseCount >= shakeComposerCount) {
+      shakeMouseCount = (shakeComposerCount - 1).clamp(1, 4);
+      _prefs.setInt('shake_mouse_count', shakeMouseCount);
+    }
+    _prefs.setInt('shake_composer_count', shakeComposerCount);
     notifyListeners();
   }
 

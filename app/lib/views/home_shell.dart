@@ -38,9 +38,9 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _wireUp();
-      _initForegroundService();
     });
-    // Shake → 1-2 shake: mouse page, 3-4 shake: composer page
+    // Shake → Settings ke counts ke hisab se: mouseCount shake par
+    // mouse page, composerCount shake par composer page.
     try {
       _shake = ShakeDetector(onShake: _onShake)..start();
     } catch (_) {
@@ -52,6 +52,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _shake?.stop();
     _settings?.removeListener(_syncMotion);
+    _settings?.removeListener(_syncShakeService);
     _motion?.dispose();
     _pageController.dispose();
     _shakeResetTimer?.cancel();
@@ -62,6 +63,14 @@ class _HomeShellState extends State<HomeShell> {
   void _syncMotion() => _motion?.sync();
 
   void _onShake() {
+    final s = _settings;
+    // Shake band ho ya dono actions off hon to kuch na karo.
+    if (s != null && !s.shakeEnabled) return;
+    final mouseOn = s?.shakeMouseEnabled ?? true;
+    final composerOn = s?.shakeComposerEnabled ?? true;
+    if (!mouseOn && !composerOn) return;
+    final mouseCount = s?.shakeMouseCount ?? 2;
+    final composerCount = s?.shakeComposerCount ?? 4;
     setState(() {
       _shakeCount++;
     });
@@ -69,12 +78,14 @@ class _HomeShellState extends State<HomeShell> {
     _shakeResetTimer = Timer(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() {
-        if (_shakeCount >= 1 && _shakeCount <= 2) {
-          _goToMouse();
-        } else if (_shakeCount >= 3 && _shakeCount <= 4) {
-          _openComposer();
-        }
+        final count = _shakeCount;
         _shakeCount = 0;
+        // Composer ka count zyada hai — pehle wahi check karo.
+        if (composerOn && count >= composerCount) {
+          _openComposer();
+        } else if (mouseOn && count >= mouseCount) {
+          _goToMouse();
+        }
       });
     });
   }
@@ -93,9 +104,11 @@ class _HomeShellState extends State<HomeShell> {
     _settings = settings;
     _motion = MotionController(conn: conn, settings: settings);
     settings.addListener(_syncMotion);
+    settings.addListener(_syncShakeService);
     _motion!.sync();
     settings.loaded.then((_) {
       if (!mounted) return;
+      _syncShakeService();
       final host = settings.host;
       if (host != null && host.isNotEmpty) {
         conn.connect(host, settings.port, token: settings.token);
@@ -104,9 +117,19 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// Shake-to-open service — app band ho (swipe away) tab bhi shake
-  /// pakadta hai aur app wapas khol deta hai.
-  Future<void> _initForegroundService() async {
+  /// pakadta hai aur app wapas khol deta hai. Sirf tab chalta hai
+  /// jab Settings me Shake on ho; off ho to service ruk jati hai.
+  Future<void> _syncShakeService() async {
+    final settings = _settings;
+    if (settings == null) return;
     try {
+      if (!settings.shakeEnabled) {
+        if (await FlutterForegroundTask.isRunningService) {
+          await FlutterForegroundTask.stopService();
+        }
+        return;
+      }
+      if (await FlutterForegroundTask.isRunningService) return;
       FlutterForegroundTask.init(
         androidNotificationOptions: AndroidNotificationOptions(
           channelId: 'mousify_shake',
@@ -128,14 +151,12 @@ class _HomeShellState extends State<HomeShell> {
       if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
         await FlutterForegroundTask.requestIgnoreBatteryOptimization();
       }
-      if (!await FlutterForegroundTask.isRunningService) {
-        await FlutterForegroundTask.startService(
-          serviceId: 256,
-          notificationTitle: 'Mousify',
-          notificationText: 'Shake the phone to open the touchpad',
-          callback: mousifyServiceCallback,
-        );
-      }
+      await FlutterForegroundTask.startService(
+        serviceId: 256,
+        notificationTitle: 'Mousify',
+        notificationText: 'Shake the phone to open the touchpad',
+        callback: mousifyServiceCallback,
+      );
     } catch (_) {
       // service fail ho to app normal chalti rahe
     }

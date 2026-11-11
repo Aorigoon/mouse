@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mousify/auth/auth_service.dart';
+import 'package:mousify/connection/settings_store.dart';
 import 'package:mousify/main.dart';
 import 'package:mousify/theme.dart';
 import 'package:mousify/views/auth_page.dart';
@@ -415,6 +416,136 @@ void main() {
     await tester.pump();
     expect(tester.widget<Switch>(rowSwitch).value, isFalse);
     expect(find.text('Motion speed'), findsNothing);
+  });
+
+  testWidgets('settings row - Shake: ek row hai, tap par sheet khulti hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    // Page par sirf ek Shake row hai (chevron wali) — koi inline
+    // toggle ya slider nahi.
+    expect(find.text('Shake'), findsOneWidget);
+    expect(find.text('Mouse pad'), findsNothing);
+    expect(find.text('Typing'), findsNothing);
+    expect(find.byKey(const Key('shake-enabled-switch')), findsNothing);
+
+    // Row par tap — Pointer sensitivity jaisi bottom sheet khule.
+    await tester.ensureVisible(find.text('Shake'));
+    await tester.tap(find.text('Shake'));
+    await tester.pumpAndSettle();
+
+    // Sheet me Shake / Mouse pad / Typing toggles (default ON) +
+    // dono count sliders (SpeedSlider, 2 aur 4).
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const Key('shake-enabled-switch')))
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const Key('shake-mouse-switch')))
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const Key('shake-composer-switch')))
+          .value,
+      isTrue,
+    );
+    expect(find.text('Mouse pad shakes'), findsOneWidget);
+    expect(find.text('Typing shakes'), findsOneWidget);
+    expect(find.byKey(const Key('shake-mouse-count-track')), findsOneWidget);
+    expect(
+      find.byKey(const Key('shake-composer-count-track')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shake sheet - master off karne par action rows chhup jati hain',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.ensureVisible(find.text('Shake'));
+    await tester.tap(find.text('Shake'));
+    await tester.pumpAndSettle();
+
+    final master = find.byKey(const Key('shake-enabled-switch'));
+    await tester.tap(master);
+    await tester.pump();
+
+    expect(tester.widget<Switch>(master).value, isFalse);
+    expect(find.text('Mouse pad'), findsNothing);
+    expect(find.text('Typing'), findsNothing);
+    expect(find.byKey(const Key('shake-mouse-count-track')), findsNothing);
+    expect(find.byKey(const Key('shake-composer-count-track')), findsNothing);
+  });
+
+  testWidgets(
+      'shake sheet - Typing off karne par sirf Mouse ka slider rehta hai',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.ensureVisible(find.text('Shake'));
+    await tester.tap(find.text('Shake'));
+    await tester.pumpAndSettle();
+
+    final composer = find.byKey(const Key('shake-composer-switch'));
+    await tester.tap(composer);
+    await tester.pump();
+
+    expect(tester.widget<Switch>(composer).value, isFalse);
+    expect(find.byKey(const Key('shake-mouse-count-track')), findsOneWidget);
+    expect(find.byKey(const Key('shake-composer-count-track')), findsNothing);
+    expect(find.text('Mouse pad shakes'), findsOneWidget);
+    expect(find.text('Typing shakes'), findsNothing);
+  });
+
+  testWidgets('shake sheet - Shake sheet golden', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+    await pumpApp(tester);
+    await goToSettings(tester);
+
+    await tester.ensureVisible(find.text('Shake'));
+    await tester.tap(find.text('Shake'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/shake_sheet.png'),
+    );
+  });
+
+  test('shake counts - composer ka count hamesha mouse se zyada rehta hai',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = AppSettings();
+    await settings.loaded;
+
+    expect(settings.shakeEnabled, isTrue);
+    expect(settings.shakeMouseCount, 2);
+    expect(settings.shakeComposerCount, 4);
+
+    // Mouse count 4 karo to composer khud 5 ho jata hai.
+    settings.setShakeMouseCount(4);
+    expect(settings.shakeMouseCount, 4);
+    expect(settings.shakeComposerCount, 5);
+
+    // Composer count 2 karo to mouse khud 1 ho jata hai.
+    settings.setShakeComposerCount(2);
+    expect(settings.shakeComposerCount, 2);
+    expect(settings.shakeMouseCount, 1);
   });
 
   testWidgets('settings row - Profile tap se ProfilePage khulti hai',
