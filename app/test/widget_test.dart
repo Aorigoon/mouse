@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mousify/main.dart';
 import 'package:mousify/widgets/apps_grid_icon.dart';
+import 'package:mousify/widgets/close_icon.dart';
 import 'package:mousify/widgets/floating_nav_bar.dart';
 import 'package:mousify/widgets/quick_tools_stick.dart';
 import 'package:mousify/widgets/toolbox_icon.dart';
@@ -24,13 +25,14 @@ void main() {
     expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
     expect(find.byIcon(Icons.touch_app_rounded), findsWidgets);
     expect(find.byType(AppsGridIcon), findsOneWidget);
-    // ToolboxIcon ab do jagah hai — nav Tools tab + quick-tools trigger.
+    // ToolboxIcon ab sirf quick-tools trigger par hai — nav se
+    // Tools tab hata diya gaya hai (2026-11-11).
     expect(
       find.descendant(
         of: find.byType(FloatingNavBar),
         matching: find.byType(ToolboxIcon),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(
@@ -102,13 +104,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Stick band hai — 5 tools nazar nahi aate, trigger toolbox hai.
+    // (Nav se Tools tab hata diya gaya hai — sirf trigger par hai.)
     expect(find.byKey(const Key('tool-select-all')), findsNothing);
     expect(find.byKey(const Key('tool-copy')), findsNothing);
     expect(find.byKey(const Key('tool-paste')), findsNothing);
     expect(find.byKey(const Key('tool-undo')), findsNothing);
     expect(find.byKey(const Key('tool-clear')), findsNothing);
-    expect(find.byIcon(Icons.close_rounded), findsNothing);
-    expect(find.byType(ToolboxIcon), findsNWidgets(2));
+    expect(find.byType(CloseIcon), findsNothing);
+    expect(find.byType(ToolboxIcon), findsOneWidget);
 
     // Tap — YAHI pill upar expand hoti hai (koi alag partition
     // nahi), 5 tools, neeche wala icon cross (X) ban jata hai.
@@ -119,8 +122,10 @@ void main() {
     expect(find.byKey(const Key('tool-paste')), findsOneWidget);
     expect(find.byKey(const Key('tool-undo')), findsOneWidget);
     expect(find.byKey(const Key('tool-clear')), findsOneWidget);
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
-    expect(find.byType(ToolboxIcon), findsOneWidget);
+    expect(find.byType(CloseIcon), findsOneWidget);
+    // Khuli ho to trigger X hai, ToolboxIcon kahin nahi (nav se
+    // Tools tab hata diya gaya hai).
+    expect(find.byType(ToolboxIcon), findsNothing);
     expect(find.text('WINDOWS'), findsNothing);
     expect(find.text('Not connected'), findsNothing);
 
@@ -130,12 +135,13 @@ void main() {
     expect(find.byKey(const Key('tool-copy')), findsOneWidget);
 
     // X dabao — animation ke saath reduce, stick gayab, wapas toolbox.
+    // (Nav se Tools tab hata diya gaya hai — sirf trigger par hai.)
     await tester.tap(find.byKey(const Key('quick-tools-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('tool-select-all')), findsNothing);
     expect(find.byKey(const Key('tool-clear')), findsNothing);
-    expect(find.byIcon(Icons.close_rounded), findsNothing);
-    expect(find.byType(ToolboxIcon), findsNWidgets(2));
+    expect(find.byType(CloseIcon), findsNothing);
+    expect(find.byType(ToolboxIcon), findsOneWidget);
   });
 
   testWidgets('home - guide chip closes, content fade-out hota hai',

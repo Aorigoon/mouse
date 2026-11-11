@@ -3,7 +3,6 @@ import '../utils/haptics.dart';
 
 import '../theme.dart';
 import 'apps_grid_icon.dart';
-import 'toolbox_icon.dart';
 
 /// Floating rounded bottom navigation — Mousify ka naya premium nav.
 ///
@@ -38,11 +37,6 @@ class FloatingNavBar extends StatelessWidget {
       // Zain ki reference image wala 2x2 grid icon (3 squircle +
       // upar-right diamond) — Material apps_rounded nahi.
       customIcon: (color) => AppsGridIcon(color: color),
-    ),
-    _NavItem(
-      label: 'Tools',
-      // Zain ka diya hua Lucide toolbox SVG — Material handyman nahi.
-      customIcon: (color) => ToolboxIcon(color: color),
     ),
     _NavItem(
       label: 'Settings',

@@ -8,6 +8,7 @@ import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
 import '../theme.dart';
 import '../views/composer_page.dart';
+import 'media_tools_stick.dart';
 import 'quick_tools_stick.dart';
 
 /// Plain black touchpad:
@@ -41,6 +42,9 @@ class _TouchpadAreaState extends State<TouchpadArea> {
 
   final ValueNotifier<Offset?> _touch = ValueNotifier<Offset?>(null);
   final ValueNotifier<bool> _scrolling = ValueNotifier<bool>(false);
+  // Kaunsi stick khuli hai ('tools' / 'media' / null) — dono sticks
+  // share karti hain taaki ek waqt me sirf ek khuli ho.
+  final ValueNotifier<String?> _openStick = ValueNotifier<String?>(null);
 
   static const _longPressMs = 320;
   static const _moveThreshold = 10.0;
@@ -54,6 +58,7 @@ class _TouchpadAreaState extends State<TouchpadArea> {
     _pendingClick?.cancel();
     _touch.dispose();
     _scrolling.dispose();
+    _openStick.dispose();
     super.dispose();
   }
 
@@ -220,12 +225,23 @@ class _TouchpadAreaState extends State<TouchpadArea> {
           bottom: 118,
           child: _RightClickButton(onTap: _rightClick),
         ),
+        // Media-tools stick — tools stick ke UPAR, alag stick (merge
+        // nahi hoti). Tap par stick ki tarah seedha upar expand hoti
+        // hai (play, ±10s, volume, screenshot).
+        // NOTE: Stack me QuickToolsStick ke NEECHE hai taaki tools
+        // stick khule to uski column media button ko dhak le (ek
+        // waqt me ek hi stick khuli hoti hai).
+        Positioned(
+          right: 20,
+          bottom: 250,
+          child: MediaToolsStick(openStick: _openStick),
+        ),
         // Quick-tools stick — right-click button ke upar. Tap par
         // stick ki tarah seedha upar expand hoti hai (54 chaudi).
-        const Positioned(
+        Positioned(
           right: 20,
           bottom: 184,
-          child: QuickToolsStick(),
+          child: QuickToolsStick(openStick: _openStick),
         ),
       ],
     );

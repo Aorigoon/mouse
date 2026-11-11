@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
 import '../connection/settings_store.dart';
+import '../connection/windows.dart';
 
 class _AppInfo {
   final String id;
@@ -124,6 +125,9 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
       });
       return;
     }
+    // Windows list bhi refresh karo (Tools page hata diya gaya hai —
+    // windows switcher ab Apps page par hai).
+    context.read<WindowsService>().refresh();
     if (_requestedFor == '${_conn.host}:${_conn.port}' && _apps.isNotEmpty) {
       return;
     }
@@ -182,6 +186,7 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final conn = context.watch<MousifyConnection>();
     final settings = context.watch<AppSettings>();
+    final windowsService = context.watch<WindowsService>();
     final scheme = Theme.of(context).colorScheme;
 
     final query = _query.toLowerCase();
@@ -228,7 +233,7 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: _buildApps(context, conn, pinned, rest),
+                child: _buildApps(context, conn, windowsService, pinned, rest),
               ),
             ],
           ),
@@ -259,6 +264,7 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
   Widget _buildApps(
     BuildContext context,
     MousifyConnection conn,
+    WindowsService windowsService,
     List<_AppInfo> pinned,
     List<_AppInfo> rest,
   ) {
@@ -297,6 +303,70 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 120), // Floating nav ke liye jagah
         children: [
+          // Windows — Tools page hata diya gaya hai, switcher ab yahin
+          // hai (khuli windows, tap karo to switch). Sirf connected
+          // hone par dikhta hai.
+          if (conn.isReady) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Windows',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  windowsService.loading
+                      ? const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => windowsService.refresh(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              Icons.refresh,
+                              size: 18,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+            if (windowsService.windows.isNotEmpty)
+              for (final w in windowsService.windows)
+                _WindowRow(
+                  app: w.app,
+                  title: w.title,
+                  onTap: () {
+                    Haptics.click();
+                    windowsService.focus(w);
+                  },
+                )
+            else if (!windowsService.loading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+                child: Text(
+                  'Koi window nahi mili',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
           if (pinned.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
@@ -371,6 +441,66 @@ class _DockPageState extends State<DockPage> with WidgetsBindingObserver {
     final host = _conn.host;
     if (host == null || host.isEmpty) return null;
     return 'http://$host:${_conn.port + 1}/icon/$id';
+  }
+}
+
+/// Windows switcher row — khuli PC window, tap karo to switch.
+class _WindowRow extends StatelessWidget {
+  final String app;
+  final String title;
+  final VoidCallback onTap;
+
+  const _WindowRow({
+    required this.app,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
+        child: Row(
+          children: [
+            Icon(
+              Icons.window_outlined,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    app,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

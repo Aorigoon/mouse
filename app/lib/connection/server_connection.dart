@@ -55,6 +55,13 @@ class MousifyConnection extends ChangeNotifier {
   /// Server ke non-connection events (apps, etc.) — pages listen kar sakti hain.
   Stream<Map<String, dynamic>> get events => _events.stream;
 
+  /// Test-only: server event inject karo (jaise 'shot') — bina real
+  /// server ke flow test karne ke liye.
+  @visibleForTesting
+  void injectEvent(Map<String, dynamic> msg) {
+    if (!_events.isClosed) _events.add(msg);
+  }
+
   void connect(String newHost, int newPort, {String? token}) {
     host = newHost;
     port = newPort;

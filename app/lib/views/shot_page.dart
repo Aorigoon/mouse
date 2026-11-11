@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../widgets/back_chip.dart';
+import '../widgets/copy_icon.dart';
+import '../widgets/download_icon.dart';
+
 /// PC ka screenshot — full screen, pinch-zoom ke saath.
 /// Options: copy to clipboard, save to gallery.
 class ShotPage extends StatefulWidget {
@@ -63,36 +67,84 @@ class _ShotPageState extends State<ShotPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Page theme follow karta hai — kaala hardcode NAHI (light mode
+    // me safed surface, dark mode me dark). Back button sirf bare
+    // arrow hai (BackArrowPainter, theme ink) — peeche koi gol chip /
+    // background nahi; icon ka color theme se badalta hai (dark mode
+    // me halka, light mode me gehra).
+    final scheme = Theme.of(context).colorScheme;
+    final ink = scheme.onSurface;
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: const Text('PC Screenshot'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'Save to gallery',
-            icon: _saved
-                ? const Icon(Icons.done_all, color: Colors.green)
-                : const Icon(Icons.save_outlined),
-            onPressed: _saveToGallery,
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Copy to phone clipboard',
-            icon: const Icon(Icons.copy_outlined),
-            onPressed: _copyToClipboard,
-          ),
-        ],
-      ),
-      body: InteractiveViewer(
-        maxScale: 5,
-        child: Center(
-          child: Image.memory(
-            Uint8List.fromList(widget.bytes),
-            fit: BoxFit.contain,
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header — AppBar nahi, app ka apna pattern: bare back
+            // arrow + title + save/copy (Lucide icons).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.of(context).pop(),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Center(
+                          child: CustomPaint(
+                            size: const Size(30, 24),
+                            painter: BackArrowPainter(ink),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'PC Screenshot',
+                      style: TextStyle(
+                        color: ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Save to gallery',
+                    icon: _saved
+                        ? const Icon(Icons.done_all, color: Colors.green)
+                        // Zain ka diya hua Lucide download icon
+                        // (Material download icon nahi).
+                        : DownloadIcon(size: 24, color: ink),
+                    color: ink,
+                    onPressed: _saveToGallery,
+                  ),
+                  IconButton(
+                    tooltip: 'Copy to phone clipboard',
+                    // Zain ka diya hua Lucide copy icon.
+                    icon: CopyIcon(size: 24, color: ink),
+                    color: ink,
+                    onPressed: _copyToClipboard,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: InteractiveViewer(
+                maxScale: 5,
+                child: Center(
+                  child: Image.memory(
+                    Uint8List.fromList(widget.bytes),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

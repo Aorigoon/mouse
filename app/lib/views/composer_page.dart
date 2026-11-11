@@ -11,6 +11,7 @@ import '../connection/live_typing.dart';
 import '../connection/server_connection.dart';
 import '../theme.dart';
 import '../widgets/back_chip.dart';
+import '../widgets/copy_icon.dart';
 
 /// Composer — ek seedha notepad page: jo likho/dictate karo wo real-time
 /// PC ke focused window me type hota hai (add + delete dono). Bas.
@@ -696,7 +697,8 @@ class _ComposerActionsSheet extends StatelessWidget {
                       ),
                       _sheetDivider(ink),
                       _SheetActionRow(
-                        icon: Icons.content_copy_outlined,
+                        // Zain ka diya hua Lucide copy icon.
+                        iconBuilder: (c) => CopyIcon(size: 22, color: c),
                         label: 'Copy',
                         color: ink,
                         enabled: hasText,
@@ -731,19 +733,23 @@ class _ComposerActionsSheet extends StatelessWidget {
 /// Bottom sheet ki ek row — icon + label. Text khaali ho to halki
 /// (disabled) aur tap nahi hoti.
 class _SheetActionRow extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  // Custom icon (jaise Zain ka Lucide copy) — color yahan diya
+  // jata hai taaki disabled hone par halka bhi ho sake.
+  final Widget Function(Color)? iconBuilder;
   final String label;
   final Color color;
   final bool enabled;
   final VoidCallback onTap;
 
   const _SheetActionRow({
-    required this.icon,
+    this.icon,
+    this.iconBuilder,
     required this.label,
     required this.color,
     required this.enabled,
     required this.onTap,
-  });
+  }) : assert(icon != null || iconBuilder != null);
 
   @override
   Widget build(BuildContext context) {
@@ -754,7 +760,9 @@ class _SheetActionRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: c),
+            iconBuilder != null
+                ? iconBuilder!(c)
+                : Icon(icon, size: 22, color: c),
             const SizedBox(width: 12),
             Text(
               label,

@@ -1,13 +1,21 @@
+import 'dart:convert';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mousify/connection/server_connection.dart';
 import 'package:mousify/main.dart';
 import 'package:mousify/views/composer_page.dart';
 import 'package:mousify/views/dock_page.dart';
+import 'package:mousify/views/home_shell.dart';
+import 'package:mousify/views/shot_page.dart';
 import 'package:mousify/widgets/apps_grid_icon.dart';
+import 'package:mousify/widgets/close_icon.dart';
 import 'package:mousify/widgets/floating_nav_bar.dart';
 import 'package:mousify/widgets/quick_tools_stick.dart';
 import 'package:mousify/widgets/toolbox_icon.dart';
 import 'package:mousify/widgets/touchpad_area.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'test_helpers.dart';
@@ -43,14 +51,17 @@ void main() {
     expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
     expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
     expect(find.byType(AppsGridIcon), findsOneWidget);
-    // ToolboxIcon ab do jagah hai — nav Tools tab + quick-tools trigger.
+    // ToolboxIcon ab sirf quick-tools trigger par hai — nav se
+    // Tools tab hata diya gaya hai (2026-11-11).
     expect(
       find.descendant(
         of: find.byType(FloatingNavBar),
         matching: find.byType(ToolboxIcon),
       ),
-      findsOneWidget,
+      findsNothing,
     );
+    // Media stick trigger — tools stick ke upar, alag stick.
+    expect(find.byKey(const Key('media-tools-button')), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(QuickToolsStick),
@@ -88,11 +99,131 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('tool-select-all')), findsOneWidget);
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byType(CloseIcon), findsOneWidget);
 
     await expectLater(
       find.byType(MousifyApp),
       matchesGoldenFile('goldens/quick_tools_stick.png'),
+    );
+  });
+
+  testWidgets('real design screenshot - media tools stick',
+      (tester) async {
+    // Media stick — tools stick ke UPAR, alag stick (merge nahi).
+    // Tap par yahi pill seedha upar expand hoti hai: Rewind 10s,
+    // Play (safed), Forward 10s, Volume up/down, Screenshot.
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byKey(const Key('media-tools-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('media-tool-play')), findsOneWidget);
+    expect(find.byKey(const Key('media-tool-rewind')), findsOneWidget);
+    expect(find.byKey(const Key('media-tool-forward')), findsOneWidget);
+    expect(find.byKey(const Key('media-tool-shot')), findsOneWidget);
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/media_stick.png'),
+    );
+  });
+
+  testWidgets('media stick - ek waqt me ek hi stick khulti hai',
+      (tester) async {
+    // Dono sticks alag hain, merge nahi hoti — ek khule to dusri
+    // band ho jati hai. Tools stick khuli ho to media button uski
+    // column ke peeche chhup jata hai (is liye auto-close sirf
+    // dusri direction me tap se test hota hai: media khuli ho to
+    // tools trigger dikhta hai).
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Pehle media stick kholo.
+    await tester.tap(find.byKey(const Key('media-tools-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('media-tool-play')), findsOneWidget);
+    expect(find.byKey(const Key('tool-select-all')), findsNothing);
+
+    // Tools trigger dikhta hai (media column ke neeche) — use
+    // kholo: media stick khud band ho jani chahiye.
+    await tester.tap(find.byKey(const Key('quick-tools-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tool-select-all')), findsOneWidget);
+    expect(find.byKey(const Key('media-tool-play')), findsNothing);
+
+    // Tools band karo, phir media dobara kholo.
+    await tester.tap(find.byKey(const Key('quick-tools-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tool-select-all')), findsNothing);
+    await tester.tap(find.byKey(const Key('media-tools-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('media-tool-play')), findsOneWidget);
+    expect(find.byKey(const Key('tool-select-all')), findsNothing);
+  });
+
+  testWidgets('real design screenshot - shot page (screenshot alag page)',
+      (tester) async {
+    // Screenshot button dabao → server 'shot' bheje → alag page
+    // (ShotPage) khul kar screenshot dikhaye, pinch-zoom + save/copy.
+    SharedPreferences.setMockInitialValues({});
+    mockSensorsForTest();
+
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MousifyApp());
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Fake PC screenshot banao (1280x720) — asli server nahi hai.
+    final bytes = await tester.runAsync(_fakeScreenshotBytes);
+    final conn = Provider.of<MousifyConnection>(
+      tester.element(find.byType(HomeShell)),
+      listen: false,
+    );
+    conn.injectEvent({'t': 'shot', 'data': base64Encode(bytes!)});
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ShotPage), findsOneWidget);
+    // Image decode ho jaye taaki golden me screenshot dikhe.
+    final image = tester.widget<Image>(
+      find.descendant(
+        of: find.byType(ShotPage),
+        matching: find.byType(Image),
+      ),
+    );
+    await tester.runAsync(
+      () => precacheImage(
+        image.image,
+        tester.element(find.byType(ShotPage)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MousifyApp),
+      matchesGoldenFile('goldens/shot_page.png'),
     );
   });
 
@@ -536,4 +667,54 @@ void main() {
       112,
     );
   });
+}
+
+/// Fake PC screenshot (1280x720) — dark wallpaper + ek halki window.
+/// ShotPage golden ke liye (asli server nahi hota).
+Future<List<int>> _fakeScreenshotBytes() async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  // Wallpaper
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 1280, 720),
+    Paint()..color = const Color(0xFF20242B),
+  );
+  // Window
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      const Rect.fromLTWH(140, 90, 1000, 540),
+      const Radius.circular(16),
+    ),
+    Paint()..color = const Color(0xFFF5F5F5),
+  );
+  // Title bar
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      const Rect.fromLTWH(140, 90, 1000, 48),
+      const Radius.circular(16),
+    ),
+    Paint()..color = const Color(0xFF3B82F6),
+  );
+  // Fake content lines
+  for (var i = 0; i < 5; i++) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(180, 180 + i * 72, 920 - i * 120, 28),
+        const Radius.circular(14),
+      ),
+      Paint()..color = const Color(0xFFD6D6D6),
+    );
+  }
+  // Label (window ke andar, gehra text)
+  final builder = ui.ParagraphBuilder(
+    ui.ParagraphStyle(fontSize: 32, fontWeight: FontWeight.w600),
+  )..pushStyle(ui.TextStyle(color: const Color(0xFF222222)));
+  builder.addText('PC Desktop — Mousify');
+  final paragraph = builder.build()
+    ..layout(const ui.ParagraphConstraints(width: 600));
+  canvas.drawParagraph(paragraph, const Offset(180, 560));
+  final picture = recorder.endRecording();
+  final img = await picture.toImage(1280, 720);
+  final data = await img.toByteData(format: ui.ImageByteFormat.png);
+  return data!.buffer.asUint8List();
 }

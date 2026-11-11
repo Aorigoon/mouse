@@ -4,7 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../connection/server_connection.dart';
 import '../theme.dart';
+import 'close_icon.dart';
+import 'copy_icon.dart';
+import 'delete_icon.dart';
+import 'paste_icon.dart';
+import 'select_all_icon.dart';
 import 'toolbox_icon.dart';
+import 'undo_icon.dart';
 
 /// Home page ka quick-tools button — neeche-right, right-click
 /// button ke upar. Trigger icon bottom nav wala ToolboxIcon hai.
@@ -18,12 +24,25 @@ import 'toolbox_icon.dart';
 /// saath use hote hain), icon by icon, koi text nahi:
 ///   Select All, Copy, Paste, Undo, Clear (selection clear).
 /// Kainchi (Cut) hata di — uske jaisi remove wali icons zyada
-/// ho rahi thin, uski jagah Undo (Ctrl+Z) hai; Cut Tools page
-/// par abhi bhi maujood hai.
+/// ho rahi thin, uski jagah Undo (Ctrl+Z) hai. Tools page ka
+/// EDITING section bhi hata diya gaya hai (2026-11-11) — ye 5
+/// tools ab sirf yahin (mouse page) par hain, Tools page par
+/// duplicate nahi.
 /// Tool dabane par stick khuli rehti hai (Select All → Copy
 /// jaise chain kar sakte hain) — band sirf X se hoti hai.
+///
+/// `openStick` — media stick ke saath share hota hai taaki ek
+/// waqt me sirf ek stick khuli ho (media khule to ye band).
+/// Null ho to stick akeli kaam karti hai (purana behavior).
 class QuickToolsStick extends StatefulWidget {
-  const QuickToolsStick({super.key});
+  final ValueNotifier<String?>? openStick;
+  final String stickId;
+
+  const QuickToolsStick({
+    super.key,
+    this.openStick,
+    this.stickId = 'tools',
+  });
 
   @override
   State<QuickToolsStick> createState() => _QuickToolsStickState();
@@ -32,9 +51,36 @@ class QuickToolsStick extends StatefulWidget {
 class _QuickToolsStickState extends State<QuickToolsStick> {
   bool _expanded = false;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.openStick?.addListener(_onOpenStickChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.openStick?.removeListener(_onOpenStickChanged);
+    super.dispose();
+  }
+
+  /// Media stick khuli to ye band ho jaye (ek waqt me ek hi stick).
+  void _onOpenStickChanged() {
+    if (widget.openStick?.value != widget.stickId && _expanded) {
+      if (mounted) setState(() => _expanded = false);
+    }
+  }
+
   void _toggle() {
     Haptics.click();
-    setState(() => _expanded = !_expanded);
+    if (!_expanded) {
+      setState(() => _expanded = true);
+      widget.openStick?.value = widget.stickId;
+    } else {
+      setState(() => _expanded = false);
+      if (widget.openStick?.value == widget.stickId) {
+        widget.openStick?.value = null;
+      }
+    }
   }
 
   void _tool(String key, {bool ctrl = false}) {
@@ -114,8 +160,7 @@ class _QuickToolsStickState extends State<QuickToolsStick> {
                         );
                       },
                       child: _expanded
-                          ? Icon(
-                              Icons.close_rounded,
+                          ? CloseIcon(
                               key: const ValueKey('quick-tools-close'),
                               size: 26,
                               color: ink,
@@ -157,35 +202,43 @@ class _ToolsColumn extends StatelessWidget {
         children: [
           _StickBtn(
             key: const Key('tool-select-all'),
-            icon: Icons.select_all_rounded,
+            // Lucide square-dashed — Material select_all ki jagah.
+            // (Lucide par "box-select" nahi hai — 404.)
+            iconWidget: SelectAllIcon(size: 20, color: ink),
             ink: ink,
             onTap: () => onTool('a', ctrl: true),
           ),
           const SizedBox(height: 4),
           _StickBtn(
             key: const Key('tool-copy'),
-            icon: Icons.copy_rounded,
+            // Zain ka diya hua Lucide copy icon — size 20, stroke
+            // Lucide default 2.0 (22 par bada dikhta tha).
+            iconWidget: CopyIcon(size: 20, color: ink),
             ink: ink,
             onTap: () => onTool('c', ctrl: true),
           ),
           const SizedBox(height: 4),
           _StickBtn(
             key: const Key('tool-paste'),
-            icon: Icons.content_paste_rounded,
+            // Lucide clipboard-paste (lucide.dev) — Material paste ki jagah.
+            iconWidget: PasteIcon(size: 20, color: ink),
             ink: ink,
             onTap: () => onTool('v', ctrl: true),
           ),
           const SizedBox(height: 4),
           _StickBtn(
             key: const Key('tool-undo'),
-            icon: Icons.undo_rounded,
+            // Lucide undo-2 — Material undo ki jagah.
+            iconWidget: UndoIcon(size: 20, color: ink),
             ink: ink,
             onTap: () => onTool('z', ctrl: true),
           ),
           const SizedBox(height: 4),
           _StickBtn(
             key: const Key('tool-clear'),
-            icon: Icons.backspace_rounded,
+            // Lucide delete (backspace key + X, lucide.dev) — cross
+            // wala Material backspace icon hata diya.
+            iconWidget: DeleteIcon(size: 20, color: ink),
             ink: ink,
             onTap: () => onTool('backspace'),
           ),
@@ -198,16 +251,19 @@ class _ToolsColumn extends StatelessWidget {
 
 /// Stick ka ek tool button — 54×54, sirf icon.
 class _StickBtn extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  // Custom icon (jaise Zain ka Lucide copy) — IconData ki jagah.
+  final Widget? iconWidget;
   final Color ink;
   final VoidCallback onTap;
 
   const _StickBtn({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.ink,
     required this.onTap,
-  });
+  }) : assert(icon != null || iconWidget != null);
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +276,14 @@ class _StickBtn extends StatelessWidget {
         child: SizedBox(
           width: 54,
           height: 54,
-          child: Icon(icon, size: 24, color: ink),
+          // Center zaroori hai — baghair iske SizedBox (54x54)
+          // icon ko tight constraints deta hai aur CustomPaint
+          // apni `size` (20) ki jagah 54x54 ban jata hai (is liye
+          // size 20/22/40 sab ek jaise dikhte the). Center loose
+          // constraints deta hai, to icon apni asli size par banta hai.
+          child: Center(
+            child: iconWidget ?? Icon(icon, size: 24, color: ink),
+          ),
         ),
       ),
     );

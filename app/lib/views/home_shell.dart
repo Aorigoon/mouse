@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import '../utils/haptics.dart';
 
 import 'package:flutter/material.dart';
@@ -12,10 +13,10 @@ import '../utils/shake_service.dart';
 import '../widgets/floating_nav_bar.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dock_page.dart';
-import 'tools_page.dart';
 import 'home_page.dart';
 import 'settings_view.dart';
 import 'composer_page.dart';
+import 'shot_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -32,6 +33,7 @@ class _HomeShellState extends State<HomeShell> {
   AppSettings? _settings;
   int _shakeCount = 0;
   Timer? _shakeResetTimer;
+  StreamSubscription? _connSub;
 
   @override
   void initState() {
@@ -56,7 +58,31 @@ class _HomeShellState extends State<HomeShell> {
     _motion?.dispose();
     _pageController.dispose();
     _shakeResetTimer?.cancel();
+    _connSub?.cancel();
     super.dispose();
+  }
+
+  void _onConnEvent(Map<String, dynamic> msg) {
+    if (!mounted) return;
+    switch (msg['t']) {
+      case 'shot':
+        final data = msg['data'] as String?;
+        if (data != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ShotPage(bytes: base64Decode(data)),
+            ),
+          );
+        }
+        break;
+      case 'shot-fail':
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Screenshot fail: ${msg['reason']}')),
+        );
+        break;
+      default:
+        break;
+    }
   }
 
   /// Motion Control toggle badle to controller sync karo.
@@ -100,6 +126,10 @@ class _HomeShellState extends State<HomeShell> {
   void _wireUp() {
     final settings = context.read<AppSettings>();
     final conn = context.read<MousifyConnection>();
+    // Screenshot flow — ToolsPage hata diya gaya hai, is liye 'shot'
+    // yahin sunte hain (poori app me ek jagah): screenshot aaye to
+    // ShotPage kholo, fail ho to SnackBar.
+    _connSub = conn.events.listen(_onConnEvent);
     // Motion Control — sheet ka toggle badle to turant on/off.
     _settings = settings;
     _motion = MotionController(conn: conn, settings: settings);
@@ -218,7 +248,6 @@ class _HomeShellState extends State<HomeShell> {
               children: const [
                 _KeepAlive(child: HomePage()),
                 _KeepAlive(child: DockPage()),
-                _KeepAlive(child: ToolsPage()),
                 _KeepAlive(child: SettingsView()),
               ],
             ),
